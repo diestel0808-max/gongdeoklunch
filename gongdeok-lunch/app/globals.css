@@ -1,0 +1,34 @@
+/* 대학내일 브랜드 컬러 - 나중에 다른 파일에서도 재사용하기 편하게 CSS 변수로 정의 */
+:root {
+  --color-navy: #1b2a34;      /* 로고의 진한 네이비/차콜 */
+  --color-teal: #1bc5d8;      /* 로고의 포인트 틸 블루 */
+  --color-teal-light: #e6f9fb; /* 틸 컬러의 아주 옅은 배경용 */
+  --color-bg: #ffffff;
+  --color-gray-100: #f5f6f7;
+  --color-gray-300: #dcdfe2;
+  --color-text: #1b2a34;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+body {
+  color: var(--color-text);
+  background: var(--color-bg);
+  font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo",
+    "Malgun Gothic", sans-serif;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
