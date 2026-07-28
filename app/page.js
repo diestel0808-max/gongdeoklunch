@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import AddRestaurantModal from "@/components/AddRestaurantModal";
 import HeartIcon from "@/components/HeartIcon";
+import MyPageModal from "@/components/MyPageModal";
 import NoticeBanner from "@/components/NoticeBanner";
 import OnboardingModal from "@/components/OnboardingModal";
 import ShareButton from "@/components/ShareButton";
@@ -300,6 +301,7 @@ export default function HomePage() {
   const [allReviews, setAllReviews] = useState([]);
   const [allFavorites, setAllFavorites] = useState([]);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showMyPage, setShowMyPage] = useState(false);
 
   useEffect(() => {
     // 이 브라우저에 저장된 닉네임이 없으면(첫 접속) 온보딩 팝업을 띄움
@@ -475,6 +477,22 @@ export default function HomePage() {
             🍽 오늘 점심 뭐 먹지?
           </button>
           <ShareButton />
+          <button
+            onClick={() => setShowMyPage(true)}
+            style={{
+              fontSize: 12,
+              padding: "8px 12px",
+              borderRadius: 8,
+              border: "1px solid var(--color-gray-300)",
+              background: "#fff",
+              color: "var(--color-navy)",
+              fontWeight: 700,
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+            }}
+          >
+            🙋 마이페이지
+          </button>
           <button
             onClick={() => setShowAddRestaurant(true)}
             style={{
@@ -777,6 +795,15 @@ export default function HomePage() {
         <OnboardingModal
           onClose={() => setShowOnboarding(false)}
           onComplete={() => setShowOnboarding(false)}
+        />
+      )}
+
+      {showMyPage && (
+        <MyPageModal
+          restaurants={restaurants}
+          onClose={() => setShowMyPage(false)}
+          onChanged={refreshAllReviews}
+          onFavoritesChanged={refreshAllFavorites}
         />
       )}
     </main>
