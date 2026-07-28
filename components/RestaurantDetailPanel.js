@@ -111,25 +111,27 @@ export default function RestaurantDetailPanel({ restaurant, onClose, inline = fa
           )}
         </div>
 
-        {/* 지도 */}
-        <div style={{ height: "32vh", minHeight: 180 }}>
-          <KakaoMap restaurants={[restaurant]} highlightedId={restaurant.id} />
-        </div>
+        {/* 지도 - PC 인라인 모드는 왼쪽에 이미 같은 식당이 강조 표시되므로 생략 */}
+        {!inline && (
+          <div style={{ height: "32vh", minHeight: 180 }}>
+            <KakaoMap restaurants={[restaurant]} highlightedId={restaurant.id} />
+          </div>
+        )}
 
         <div style={{ padding: 20 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
             <div>
-              <h1 style={{ fontSize: 19, fontWeight: 700 }}>{restaurant.name}</h1>
-              <p style={{ fontSize: 13, color: "#7a8288", marginTop: 4 }}>{restaurant.address}</p>
+              <h1 style={{ fontSize: 22, fontWeight: 700 }}>{restaurant.name}</h1>
+              <p style={{ fontSize: 14, color: "#7a8288", marginTop: 4 }}>{restaurant.address}</p>
             </div>
             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
               <span
                 style={{
-                  fontSize: 12,
+                  fontSize: 13,
                   fontWeight: 700,
                   color: "var(--color-teal)",
                   background: "var(--color-teal-light)",
-                  padding: "4px 10px",
+                  padding: "5px 12px",
                   borderRadius: 6,
                   flexShrink: 0,
                 }}
@@ -142,7 +144,7 @@ export default function RestaurantDetailPanel({ restaurant, onClose, inline = fa
                   display: "flex",
                   alignItems: "center",
                   gap: 4,
-                  fontSize: 13,
+                  fontSize: 14,
                   fontWeight: 700,
                   border: "none",
                   background: "transparent",
@@ -151,19 +153,19 @@ export default function RestaurantDetailPanel({ restaurant, onClose, inline = fa
                   padding: 0,
                 }}
               >
-                <HeartIcon filled={favorited} size={18} /> {favoriteCount}
+                <HeartIcon filled={favorited} size={19} /> {favoriteCount}
               </button>
             </div>
           </div>
 
           <div
             style={{
-              marginTop: 16,
+              marginTop: 18,
               display: "flex",
               flexDirection: "column",
-              gap: 8,
-              fontSize: 13,
-              color: "#444",
+              gap: 10,
+              fontSize: 15,
+              color: "#333",
             }}
           >
             <span>
@@ -177,13 +179,13 @@ export default function RestaurantDetailPanel({ restaurant, onClose, inline = fa
           {summary && (
             <div
               style={{
-                marginTop: 16,
+                marginTop: 18,
                 background: "var(--color-gray-100)",
                 borderRadius: 10,
-                padding: 12,
+                padding: 14,
                 display: "flex",
-                gap: 12,
-                fontSize: 12,
+                gap: 14,
+                fontSize: 14,
                 flexWrap: "wrap",
               }}
             >
@@ -233,13 +235,13 @@ export default function RestaurantDetailPanel({ restaurant, onClose, inline = fa
           </div>
 
           {/* 후기 목록 - 접기/펼치기 없이 항상 전부 표시, 공감 많은 순 */}
-          <div style={{ marginTop: 24 }}>
-            <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 10 }}>
+          <div style={{ marginTop: 26 }}>
+            <h2 style={{ fontSize: 17, fontWeight: 700, marginBottom: 12 }}>
               후기 {reviews.length}개
             </h2>
 
             {reviews.length === 0 && (
-              <p style={{ fontSize: 13, color: "#999" }}>
+              <p style={{ fontSize: 14, color: "#999" }}>
                 아직 등록된 후기가 없어요. 첫 후기를 남겨보세요!
               </p>
             )}
@@ -251,37 +253,37 @@ export default function RestaurantDetailPanel({ restaurant, onClose, inline = fa
                   key={review.id}
                   style={{
                     borderBottom: "1px solid var(--color-gray-300)",
-                    paddingBottom: 12,
-                    marginBottom: 12,
+                    paddingBottom: 14,
+                    marginBottom: 14,
                   }}
                 >
-                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", fontSize: 12 }}>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", fontSize: 13 }}>
                     <span style={{ fontWeight: 700 }}>{review.nickname}</span>
                     <span style={{ color: "#999" }}>·</span>
-                    <span style={{ color: "#666" }}>⏱ {joinValues(review.waiting)}</span>
-                    <span style={{ color: "#666" }}>👤 {joinValues(review.headcount)}</span>
-                    <span style={{ color: "#666" }}>👥 {joinValues(review.recommendedFor)}</span>
-                    <span style={{ color: "#666" }}>💰 {review.priceRange} ({review.priceFeel})</span>
-                    <span style={{ color: "#666" }}>🔁 {review.revisit}</span>
+                    <span style={{ color: "#555" }}>⏱ {joinValues(review.waiting)}</span>
+                    <span style={{ color: "#555" }}>👤 {joinValues(review.headcount)}</span>
+                    <span style={{ color: "#555" }}>👥 {joinValues(review.recommendedFor)}</span>
+                    <span style={{ color: "#555" }}>💰 {review.priceRange} ({review.priceFeel})</span>
+                    <span style={{ color: "#555" }}>🔁 {review.revisit}</span>
                   </div>
                   {review.menu && (
-                    <p style={{ fontSize: 13, marginTop: 6, color: "#0a8fa0", fontWeight: 600 }}>
+                    <p style={{ fontSize: 14, marginTop: 8, color: "#0a8fa0", fontWeight: 600 }}>
                       🍽 {review.menu}
                     </p>
                   )}
                   {review.comment && (
-                    <p style={{ fontSize: 13, marginTop: 6, color: "#333" }}>{review.comment}</p>
+                    <p style={{ fontSize: 14, marginTop: 8, color: "#333" }}>{review.comment}</p>
                   )}
                   <button
                     onClick={() => handleLike(review.id)}
                     style={{
-                      marginTop: 8,
+                      marginTop: 10,
                       display: "inline-flex",
                       alignItems: "center",
                       gap: 4,
-                      fontSize: 12,
+                      fontSize: 13,
                       fontWeight: 600,
-                      padding: "4px 10px",
+                      padding: "5px 11px",
                       borderRadius: 20,
                       border: liked
                         ? "none"

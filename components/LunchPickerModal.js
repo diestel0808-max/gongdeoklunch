@@ -356,7 +356,7 @@ export default function LunchPickerModal({ restaurants, onClose, onOpenDetail })
               🤔
             </p>
             <p style={{ fontSize: 14, fontWeight: 700, color: "var(--color-navy)", marginTop: 12 }}>
-              조금 고민하는 중...
+              최적의 메뉴를 추천하는 중!
             </p>
             <p style={{ fontSize: 12, color: "#999", marginTop: 6 }}>
               동료들의 후기를 살펴보고 있어요

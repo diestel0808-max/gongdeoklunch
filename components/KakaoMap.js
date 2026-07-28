@@ -5,10 +5,6 @@ import { OFFICE } from "@/lib/constants";
 import { loadKakaoMapScript } from "@/lib/kakaoLoader";
 
 // 회사 마커와 같은 눈물방울(핀) 모양으로, 크기만 훨씬 작게 만듦
-// (예전엔 그냥 원형 점이었는데, 회사 마커와 통일감 있게 핀 모양으로 변경)
-//
-// 화면에 보이는 핀은 작지만, 탭(클릭) 가능한 영역은 그보다 넓게 잡아서
-// 모바일에서도 손가락으로 정확히 누르기 쉽도록 투명한 여백을 둘레에 둡니다.
 function buildRestaurantMarkerImage(kakao, visibleSizePx) {
   const w = visibleSizePx;
   const h = Math.round(visibleSizePx * 1.25);
@@ -17,7 +13,6 @@ function buildRestaurantMarkerImage(kakao, visibleSizePx) {
   const offsetX = canvasW / 2;
   const offsetY = canvasH - 7;
 
-  // 46x58 기준 핀 path를 원하는 크기(w,h)에 맞게 스케일링
   const scaleX = w / 46;
   const scaleY = h / 58;
 
@@ -54,8 +49,18 @@ function buildHighlightMarkerImage(kakao) {
 // highlightedId: 이 id의 식당만 회사 마커급으로 크고 다른 색(주황)으로 강조 표시
 export default function KakaoMap({ restaurants = [], onMarkerClick, highlightedId }) {
   const mapContainerRef = useRef(null);
+  const mapInstanceRef = useRef(null);
+  const clustererRef = useRef(null);
+  const markersRef = useRef([]);
   const [status, setStatus] = useState("loading");
+  const [isMapReady, setIsMapReady] = useState(false);
 
+  // ---------------------------------------------------------------
+  // 지도(kakao.maps.Map) 자체는 딱 한 번만 생성합니다.
+  // 이전에는 restaurants/highlightedId가 바뀔 때마다 지도를 통째로 새로 만들어서,
+  // 식당을 하나 클릭할 때마다 사용자가 줌/이동해둔 위치가 초기 화면(줌아웃된 전체 보기)으로
+  // 리셋되는 문제가 있었습니다. 이제는 최초 1회만 지도를 만들고, 그 이후엔 마커만 다시 그립니다.
+  // ---------------------------------------------------------------
   useEffect(() => {
     const appKey = process.env.NEXT_PUBLIC_KAKAO_JS_KEY;
 
@@ -68,7 +73,7 @@ export default function KakaoMap({ restaurants = [], onMarkerClick, highlightedI
 
     loadKakaoMapScript(appKey)
       .then((kakao) => {
-        if (!isMounted || !mapContainerRef.current) return;
+        if (!isMounted || !mapContainerRef.current || mapInstanceRef.current) return;
 
         const officePosition = new kakao.maps.LatLng(OFFICE.lat, OFFICE.lng);
         const map = new kakao.maps.Map(mapContainerRef.current, {
@@ -76,7 +81,6 @@ export default function KakaoMap({ restaurants = [], onMarkerClick, highlightedI
           level: 5,
         });
 
-        // 회사 위치는 일반 식당 마커보다 훨씬 크고 눈에 띄는 커스텀 핀으로 표시
         const officeMarkerSvg = `
           <svg xmlns="http://www.w3.org/2000/svg" width="46" height="58" viewBox="0 0 46 58">
             <path d="M23 0C10.3 0 0 10.3 0 23c0 17.3 23 35 23 35s23-17.7 23-35C46 10.3 35.7 0 23 0z" fill="#1b2a34"/>
@@ -99,101 +103,9 @@ export default function KakaoMap({ restaurants = [], onMarkerClick, highlightedI
         });
         officeInfo.open(map, officeMarker);
 
-        // 거리 정규화를 위한 최댓값 (0으로 나누는 것 방지)
-        const maxDistance = Math.max(...restaurants.map((r) => r.distanceMeters || 0), 1);
-        const MIN_SIZE = 10; // 가장 먼 식당 마커 크기
-        const MAX_SIZE = 16; // 가장 가까운 식당 마커 크기 (클러스터 풀렸을 때도 잘 보이도록)
-
-        const restaurantMarkers = [];
-        const clusterableMarkers = [];
-
-        restaurants.forEach((restaurant) => {
-          const position = new kakao.maps.LatLng(restaurant.lat, restaurant.lng);
-          const isHighlighted = highlightedId && String(restaurant.id) === String(highlightedId);
-
-          const ratio = Math.min((restaurant.distanceMeters || 0) / maxDistance, 1);
-          const sizePx = Math.round(MAX_SIZE - (MAX_SIZE - MIN_SIZE) * ratio);
-
-          const marker = new kakao.maps.Marker({
-            position,
-            image: isHighlighted
-              ? buildHighlightMarkerImage(kakao)
-              : buildRestaurantMarkerImage(kakao, sizePx),
-            zIndex: isHighlighted ? 9 : Math.round(10 - ratio * 5),
-          });
-
-          const infoWindow = new kakao.maps.InfoWindow({
-            content: `<div style="padding:6px 10px;font-size:12px;">${restaurant.name}</div>`,
-          });
-
-          kakao.maps.event.addListener(marker, "mouseover", () => infoWindow.open(map, marker));
-          kakao.maps.event.addListener(marker, "mouseout", () => infoWindow.close());
-
-          if (onMarkerClick) {
-            kakao.maps.event.addListener(marker, "click", () => onMarkerClick(restaurant));
-          }
-
-          restaurantMarkers.push(marker);
-
-          if (isHighlighted) {
-            // 강조 마커는 클러스터에 묶이지 않고 항상 크고 눈에 띄게 별도로 표시
-            marker.setMap(map);
-            infoWindow.open(map, marker);
-          } else {
-            clusterableMarkers.push(marker);
-          }
-        });
-
-        // 식당이 여러 곳이고 밀집된 지역에서는 점들이 서로 겹쳐서 누르기 어려우므로,
-        // 카카오 클러스터러로 가까운 마커들을 숫자 뭉치로 묶어서 보여줍니다.
-        // 확대(줌인)하면 클러스터가 자동으로 풀리면서 개별 마커가 눌리기 쉬운 간격으로 흩어져요.
-        if (clusterableMarkers.length > 1) {
-          const clusterer = new kakao.maps.MarkerClusterer({
-            map,
-            averageCenter: true,
-            minLevel: 4, // 이 레벨보다 축소된(숫자가 큰) 상태에서만 클러스터로 묶임
-            gridSize: 60,
-            styles: [
-              {
-                width: "34px",
-                height: "34px",
-                background: "rgba(27,42,52,0.85)",
-                color: "#fff",
-                borderRadius: "17px",
-                textAlign: "center",
-                lineHeight: "34px",
-                fontSize: "12px",
-                fontWeight: "700",
-              },
-              {
-                width: "42px",
-                height: "42px",
-                background: "rgba(27,42,52,0.9)",
-                color: "#fff",
-                borderRadius: "21px",
-                textAlign: "center",
-                lineHeight: "42px",
-                fontSize: "13px",
-                fontWeight: "700",
-              },
-            ],
-          });
-          clusterer.addMarkers(clusterableMarkers);
-        } else {
-          clusterableMarkers.forEach((marker) => marker.setMap(map));
-        }
-
-        // 식당이 1곳뿐인 경우(상세페이지)만 회사-식당 두 지점 기준으로 범위를 맞추고,
-        // 여러 곳일 때(홈 화면 전체 지도)는 좌표 이상치 하나 때문에 지도가 서울 전체로
-        // 확 줌아웃되는 것을 막기 위해 고정 줌 레벨(5)을 그대로 사용합니다.
-        if (restaurants.length === 1) {
-          const bounds = new kakao.maps.LatLngBounds();
-          bounds.extend(officePosition);
-          bounds.extend(new kakao.maps.LatLng(restaurants[0].lat, restaurants[0].lng));
-          map.setBounds(bounds, 60, 60, 60, 60);
-        }
-
+        mapInstanceRef.current = { map, kakao, officePosition };
         setStatus("ready");
+        setIsMapReady(true);
       })
       .catch((error) => {
         console.error("카카오맵 로드/렌더링 오류:", error);
@@ -204,7 +116,116 @@ export default function KakaoMap({ restaurants = [], onMarkerClick, highlightedI
       isMounted = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [restaurants, highlightedId]);
+  }, []);
+
+  // ---------------------------------------------------------------
+  // 마커는 restaurants/highlightedId가 바뀔 때마다 다시 그리지만,
+  // 지도 자체(중심/줌 레벨)는 절대 건드리지 않아서 사용자가 보고 있던 화면이 유지됩니다.
+  // ---------------------------------------------------------------
+  useEffect(() => {
+    if (!isMapReady || !mapInstanceRef.current) return;
+
+    const { map, kakao, officePosition } = mapInstanceRef.current;
+
+    if (clustererRef.current) {
+      clustererRef.current.clear();
+      clustererRef.current = null;
+    }
+    markersRef.current.forEach((marker) => marker.setMap(null));
+    markersRef.current = [];
+
+    const maxDistance = Math.max(...restaurants.map((r) => r.distanceMeters || 0), 1);
+    const MIN_SIZE = 10;
+    const MAX_SIZE = 16;
+
+    const allMarkers = [];
+    const clusterableMarkers = [];
+
+    restaurants.forEach((restaurant) => {
+      const position = new kakao.maps.LatLng(restaurant.lat, restaurant.lng);
+      const isHighlighted = highlightedId && String(restaurant.id) === String(highlightedId);
+
+      const ratio = Math.min((restaurant.distanceMeters || 0) / maxDistance, 1);
+      const sizePx = Math.round(MAX_SIZE - (MAX_SIZE - MIN_SIZE) * ratio);
+
+      const marker = new kakao.maps.Marker({
+        position,
+        image: isHighlighted
+          ? buildHighlightMarkerImage(kakao)
+          : buildRestaurantMarkerImage(kakao, sizePx),
+        zIndex: isHighlighted ? 9 : Math.round(10 - ratio * 5),
+      });
+
+      const infoWindow = new kakao.maps.InfoWindow({
+        content: `<div style="padding:6px 10px;font-size:12px;">${restaurant.name}</div>`,
+      });
+
+      kakao.maps.event.addListener(marker, "mouseover", () => infoWindow.open(map, marker));
+      kakao.maps.event.addListener(marker, "mouseout", () => infoWindow.close());
+
+      if (onMarkerClick) {
+        kakao.maps.event.addListener(marker, "click", () => onMarkerClick(restaurant));
+      }
+
+      allMarkers.push(marker);
+
+      if (isHighlighted) {
+        marker.setMap(map);
+        infoWindow.open(map, marker);
+      } else {
+        clusterableMarkers.push(marker);
+      }
+    });
+
+    markersRef.current = allMarkers;
+
+    if (clusterableMarkers.length > 1) {
+      const clusterer = new kakao.maps.MarkerClusterer({
+        map,
+        averageCenter: true,
+        minLevel: 4,
+        gridSize: 60,
+        styles: [
+          {
+            width: "34px",
+            height: "34px",
+            background: "rgba(27,42,52,0.85)",
+            color: "#fff",
+            borderRadius: "17px",
+            textAlign: "center",
+            lineHeight: "34px",
+            fontSize: "12px",
+            fontWeight: "700",
+          },
+          {
+            width: "42px",
+            height: "42px",
+            background: "rgba(27,42,52,0.9)",
+            color: "#fff",
+            borderRadius: "21px",
+            textAlign: "center",
+            lineHeight: "42px",
+            fontSize: "13px",
+            fontWeight: "700",
+          },
+        ],
+      });
+      clusterer.addMarkers(clusterableMarkers);
+      clustererRef.current = clusterer;
+    } else {
+      clusterableMarkers.forEach((marker) => marker.setMap(map));
+    }
+
+    // 식당이 정확히 1곳뿐인 경우(상세페이지 전용 지도)만, 이 지도가 처음 그려질 때
+    // 회사-식당 두 지점이 잘 보이도록 범위를 맞춥니다. 홈 화면의 여러 식당이 있는
+    // 지도에서는 이 로직이 실행되지 않아서, 사용자가 보고 있던 화면이 그대로 유지돼요.
+    if (restaurants.length === 1) {
+      const bounds = new kakao.maps.LatLngBounds();
+      bounds.extend(officePosition);
+      bounds.extend(new kakao.maps.LatLng(restaurants[0].lat, restaurants[0].lng));
+      map.setBounds(bounds, 60, 60, 60, 60);
+    }
+  }, [restaurants, highlightedId, isMapReady, onMarkerClick]);
 
   if (status === "error") {
     return (
