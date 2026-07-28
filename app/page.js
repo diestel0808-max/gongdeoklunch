@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import AddRestaurantModal from "@/components/AddRestaurantModal";
 import HeartIcon from "@/components/HeartIcon";
 import NoticeBanner from "@/components/NoticeBanner";
+import ShareButton from "@/components/ShareButton";
 import KakaoMap from "@/components/KakaoMap";
 import LunchPickerModal from "@/components/LunchPickerModal";
 import ReviewModal from "@/components/ReviewModal";
@@ -424,7 +425,7 @@ export default function HomePage() {
           <h1 style={{ fontSize: 16, fontWeight: 700 }}>댕턴뭐먹지</h1>
           <p style={{ fontSize: 12, color: "#7a8288" }}>{OFFICE.name} 기준</p>
         </div>
-        <div style={{ display: "flex", gap: 6 }}>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
           <button
             onClick={() => setShowLunchPicker(true)}
             style={{
@@ -441,6 +442,7 @@ export default function HomePage() {
           >
             🍽 오늘 점심 뭐 먹지?
           </button>
+          <ShareButton />
           <button
             onClick={() => setShowAddRestaurant(true)}
             style={{
