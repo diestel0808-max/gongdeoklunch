@@ -44,7 +44,8 @@ function MultiChipGroup({ label, options, values, onToggle, hint }) {
   );
 }
 
-function RestaurantResultCard({ restaurant, onOpenDetail }) {
+function RestaurantResultCard({ result, totalConditions, onOpenDetail }) {
+  const { restaurant, matchedCount } = result;
   return (
     <div
       style={{
@@ -54,7 +55,7 @@ function RestaurantResultCard({ restaurant, onOpenDetail }) {
         marginBottom: 10,
       }}
     >
-      <div style={{ display: "flex", justifyContent: "space-between" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <span style={{ fontSize: 14, fontWeight: 700 }}>{restaurant.name}</span>
         <span
           style={{
@@ -64,6 +65,7 @@ function RestaurantResultCard({ restaurant, onOpenDetail }) {
             background: "var(--color-teal-light)",
             padding: "2px 8px",
             borderRadius: 6,
+            flexShrink: 0,
           }}
         >
           {restaurant.category}
@@ -72,6 +74,11 @@ function RestaurantResultCard({ restaurant, onOpenDetail }) {
       <p style={{ fontSize: 12, color: "#7a8288", marginTop: 4 }}>
         🚶 도보 {restaurant.walkMinutes}분 · {restaurant.address}
       </p>
+      {totalConditions > 0 && (
+        <p style={{ fontSize: 11, color: "var(--color-navy)", fontWeight: 700, marginTop: 4 }}>
+          🎯 조건 {matchedCount}/{totalConditions} 일치
+        </p>
+      )}
       <button
         onClick={() => onOpenDetail(restaurant)}
         style={{
@@ -107,46 +114,59 @@ export default function LunchPickerModal({ restaurants, onClose, onOpenDetail })
     setList(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
   };
 
-  const candidates = useMemo(() => {
+  // ---------------------------------------------------------------
+  // 점수 기반 추천: 조건을 "다 맞아야만 통과"가 아니라, 5개 조건군(카테고리/거리/
+  // 가격/동행/웨이팅) 중 사용자가 실제로 선택한 것들을 기준으로 "몇 개나 맞는지"
+  // 점수를 매겨서 높은 순으로 정렬합니다. 후기가 부족해 일부 조건을 확인할 수
+  // 없는 곳도 완전히 배제되지 않고, 맞는 조건 개수만큼 순위에 반영돼요.
+  // ---------------------------------------------------------------
+  const rankedResults = useMemo(() => {
     const maxWalkMinutes = distances.length
       ? Math.max(...distances.map((d) => distanceOptions.find((o) => o.label === d).maxWalkMinutes))
       : null;
 
-    const matchesCategoryAndDistance = (r) => {
-      if (categories.length > 0 && !categories.includes(r.category)) return false;
-      if (maxWalkMinutes !== null && r.walkMinutes > maxWalkMinutes) return false;
-      return true;
-    };
+    const selectedGroups = [
+      categories.length > 0,
+      distances.length > 0,
+      prices.length > 0,
+      companions.length > 0,
+      waitings.length > 0,
+    ].filter(Boolean).length;
 
-    const matchesReviewConditions = (r) => {
-      if (prices.length === 0 && companions.length === 0 && waitings.length === 0) return true;
-      const { waitingSet, companionSet, priceRangeSet } = getRestaurantFilterData(r.id);
-      if (prices.length > 0 && !prices.some((p) => priceRangeSet.has(p))) return false;
-      if (companions.length > 0 && !companions.some((c) => companionSet.has(c))) return false;
-      if (waitings.length > 0 && !waitings.some((w) => waitingSet.has(w))) return false;
-      return true;
-    };
+    const scored = restaurants.map((restaurant) => {
+      const { waitingSet, companionSet, priceRangeSet, reviewCount } = getRestaurantFilterData(
+        restaurant.id
+      );
 
-    const strict = restaurants
-      .filter((r) => matchesCategoryAndDistance(r) && matchesReviewConditions(r))
-      .sort((a, b) => a.walkMinutes - b.walkMinutes);
+      let matchedCount = 0;
+      if (categories.length > 0 && categories.includes(restaurant.category)) matchedCount += 1;
+      if (maxWalkMinutes !== null && restaurant.walkMinutes <= maxWalkMinutes) matchedCount += 1;
+      if (prices.length > 0 && prices.some((p) => priceRangeSet.has(p))) matchedCount += 1;
+      if (companions.length > 0 && companions.some((c) => companionSet.has(c))) matchedCount += 1;
+      if (waitings.length > 0 && waitings.some((w) => waitingSet.has(w))) matchedCount += 1;
 
-    // 후기 기반 조건(가격/인원/웨이팅)까지 만족하는 곳이 부족하면,
-    // 아직 후기가 없어서 못 걸러졌을 뿐일 수 있으니 카테고리+거리 조건만으로 대체 후보를 채웁니다.
-    let fallback = [];
-    const MIN_RESULTS = 3;
-    if (strict.length < MIN_RESULTS) {
-      const strictIds = new Set(strict.map((r) => r.id));
-      fallback = restaurants
-        .filter((r) => matchesCategoryAndDistance(r) && !strictIds.has(r.id))
-        .sort((a, b) => a.walkMinutes - b.walkMinutes)
-        .slice(0, MIN_RESULTS + 2 - strict.length);
-    }
+      return { restaurant, matchedCount, reviewCount };
+    });
 
-    return { strict, fallback };
+    scored.sort((a, b) => {
+      if (b.matchedCount !== a.matchedCount) return b.matchedCount - a.matchedCount;
+      if (b.reviewCount !== a.reviewCount) return b.reviewCount - a.reviewCount; // 후기 많은 곳 우선
+      return a.restaurant.walkMinutes - b.restaurant.walkMinutes; // 가까운 곳 우선
+    });
+
+    return { scored, totalConditions: selectedGroups };
   }, [restaurants, categories, distances, prices, companions, waitings]);
 
+  const topResults = rankedResults.scored.slice(0, 10);
   const hasAnyReviewCondition = prices.length > 0 || companions.length > 0 || waitings.length > 0;
+
+  const handleRandomPick = () => {
+    if (rankedResults.scored.length === 0) return;
+    const topScore = rankedResults.scored[0].matchedCount;
+    const topTier = rankedResults.scored.filter((r) => r.matchedCount === topScore).slice(0, 8);
+    const picked = topTier[Math.floor(Math.random() * topTier.length)];
+    onOpenDetail(picked.restaurant);
+  };
 
   return (
     <div
@@ -190,7 +210,7 @@ export default function LunchPickerModal({ restaurants, onClose, onOpenDetail })
           </button>
         </div>
         <p style={{ fontSize: 12, color: "#999", marginBottom: 16 }}>
-          원하는 조건을 자유롭게 골라주세요. 여러 개 선택할수록 후보가 좁혀져요.
+          원하는 조건을 자유롭게 골라주세요. 조건에 가장 많이 맞는 곳부터 보여드려요.
         </p>
 
         {step === "form" && (
@@ -246,75 +266,88 @@ export default function LunchPickerModal({ restaurants, onClose, onOpenDetail })
             >
               이 조건으로 추천받기
             </button>
+
+            <button
+              onClick={handleRandomPick}
+              style={{
+                width: "100%",
+                padding: "12px 0",
+                borderRadius: 8,
+                border: "1px solid var(--color-gray-300)",
+                background: "#fff",
+                color: "var(--color-navy)",
+                fontWeight: 700,
+                fontSize: 13,
+                cursor: "pointer",
+                marginTop: 8,
+              }}
+            >
+              🎲 그냥 아무거나 골라줘 (랜덤 추천)
+            </button>
           </>
         )}
 
         {step === "result" && (
           <>
-            <button
-              onClick={() => setStep("form")}
-              style={{
-                fontSize: 12,
-                color: "var(--color-navy)",
-                background: "transparent",
-                border: "none",
-                cursor: "pointer",
-                marginBottom: 12,
-                fontWeight: 600,
-              }}
-            >
-              ← 조건 다시 고르기
-            </button>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
+              <button
+                onClick={() => setStep("form")}
+                style={{
+                  fontSize: 12,
+                  color: "var(--color-navy)",
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  fontWeight: 600,
+                }}
+              >
+                ← 조건 다시 고르기
+              </button>
+              <button
+                onClick={handleRandomPick}
+                style={{
+                  fontSize: 12,
+                  color: "var(--color-navy)",
+                  background: "var(--color-teal-light)",
+                  border: "none",
+                  borderRadius: 6,
+                  padding: "4px 10px",
+                  cursor: "pointer",
+                  fontWeight: 700,
+                }}
+              >
+                🎲 랜덤 뽑기
+              </button>
+            </div>
 
             <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>
-              추천 후보 {candidates.strict.length}곳
+              추천 후보 {topResults.length}곳
             </p>
+            {rankedResults.totalConditions > 0 && (
+              <p style={{ fontSize: 11, color: "#999", marginBottom: 4 }}>
+                조건을 가장 많이 만족하는 곳부터 순서대로 보여드려요.
+              </p>
+            )}
             {hasAnyReviewCondition && (
               <p style={{ fontSize: 11, color: "#999", marginBottom: 12 }}>
-                가격/인원/웨이팅 조건은 후기가 등록된 식당만 대상이에요.
+                가격/인원/웨이팅 조건은 후기가 등록된 식당에서만 확인 가능해요.
               </p>
             )}
 
-            {candidates.strict.length === 0 && candidates.fallback.length === 0 && (
+            {topResults.length === 0 && (
               <p style={{ fontSize: 13, color: "#999", padding: "24px 0" }}>
-                조건에 맞는 식당이 없어요. 조건을 조금 줄여서 다시 시도해보세요.
+                추천할 식당이 없어요. 조건을 조금 줄여서 다시 시도해보세요.
               </p>
             )}
 
-            {candidates.strict.map((restaurant) => (
+            {topResults.map((result) => (
               <RestaurantResultCard
-                key={restaurant.id}
-                restaurant={restaurant}
+                key={result.restaurant.id}
+                result={result}
+                totalConditions={rankedResults.totalConditions}
                 onOpenDetail={onOpenDetail}
               />
             ))}
-
-            {candidates.fallback.length > 0 && (
-              <>
-                <p
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 700,
-                    marginTop: candidates.strict.length > 0 ? 20 : 0,
-                    marginBottom: 4,
-                  }}
-                >
-                  🤖 이런 식당은 어때요?
-                </p>
-                <p style={{ fontSize: 11, color: "#999", marginBottom: 12 }}>
-                  {candidates.strict.length > 0
-                    ? "후기 조건까지 딱 맞진 않지만, 카테고리·거리는 조건에 맞는 곳이에요."
-                    : "아직 후기가 부족해서 정확히 맞는 곳을 찾기 어려웠어요. 대신 카테고리·거리 조건에 맞는 곳을 추천드려요."}
-                </p>
-                {candidates.fallback.map((restaurant) => (
-                  <RestaurantResultCard
-                    key={restaurant.id}
-                    restaurant={restaurant}
-                    onOpenDetail={onOpenDetail}
-                  />
-                ))}
-              </>
-            )}
           </>
         )}
       </div>
