@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import KakaoMap from "@/components/KakaoMap";
+import HeartIcon from "@/components/HeartIcon";
 import ReviewModal from "@/components/ReviewModal";
 import {
   getReviewsForRestaurant,
@@ -124,12 +125,12 @@ export default function RestaurantDetailPanel({ restaurant, onClose }) {
                   fontWeight: 700,
                   border: "none",
                   background: "transparent",
-                  color: favorited ? "#e2662f" : "#aaa",
+                  color: "#e2662f",
                   cursor: "pointer",
                   padding: 0,
                 }}
               >
-                {favorited ? "❤️" : "🤍"} {favoriteCount}
+                <HeartIcon filled={favorited} size={18} /> {favoriteCount}
               </button>
             </div>
           </div>

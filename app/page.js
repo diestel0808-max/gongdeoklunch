@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import AddRestaurantModal from "@/components/AddRestaurantModal";
+import HeartIcon from "@/components/HeartIcon";
+import NoticeBanner from "@/components/NoticeBanner";
 import KakaoMap from "@/components/KakaoMap";
 import LunchPickerModal from "@/components/LunchPickerModal";
 import ReviewModal from "@/components/ReviewModal";
@@ -104,12 +106,12 @@ function RestaurantCard({ restaurant, onWriteReview, onOpenDetail }) {
               fontWeight: 700,
               border: "none",
               background: "transparent",
-              color: favorited ? "#e2662f" : "#aaa",
+              color: "#e2662f",
               cursor: "pointer",
               padding: 0,
             }}
           >
-            {favorited ? "❤️" : "🤍"} {favoriteCount}
+            <HeartIcon filled={favorited} size={16} /> {favoriteCount}
           </button>
         </div>
       </div>
@@ -443,15 +445,28 @@ export default function HomePage() {
         </div>
       </header>
 
-      <div style={{ height: "40vh", minHeight: 220 }}>
-        <KakaoMap
-          restaurants={sortedRestaurants}
-          highlightedId={detailTarget?.id}
-          onMarkerClick={(restaurant) => setDetailTarget(restaurant)}
-        />
-      </div>
+      <NoticeBanner />
 
-      <div style={{ padding: "10px 16px 0" }}>
+      <style>{`
+        .app-content { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+        @media (min-width: 768px) {
+          .app-content { flex-direction: row; }
+          .map-pane { width: 42% !important; height: 100% !important; flex-shrink: 0; }
+          .list-pane { width: 58%; height: 100%; overflow-y: auto; }
+        }
+      `}</style>
+
+      <div className="app-content">
+        <div className="map-pane" style={{ height: "40vh", minHeight: 220 }}>
+          <KakaoMap
+            restaurants={sortedRestaurants}
+            highlightedId={detailTarget?.id}
+            onMarkerClick={(restaurant) => setDetailTarget(restaurant)}
+          />
+        </div>
+
+        <div className="list-pane">
+        <div style={{ padding: "10px 16px 0" }}>
         <input
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
@@ -654,6 +669,8 @@ export default function HomePage() {
             onOpenDetail={(target) => setDetailTarget(target)}
           />
         ))}
+      </div>
+        </div>
       </div>
 
       {reviewTarget && (
