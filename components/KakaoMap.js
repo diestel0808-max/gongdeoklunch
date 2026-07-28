@@ -77,8 +77,8 @@ export default function KakaoMap({ restaurants = [], onMarkerClick }) {
 
         // 거리 정규화를 위한 최댓값 (0으로 나누는 것 방지)
         const maxDistance = Math.max(...restaurants.map((r) => r.distanceMeters || 0), 1);
-        const MIN_SIZE = 5; // 가장 먼 식당 마커 크기
-        const MAX_SIZE = 8; // 가장 가까운 식당 마커 크기 (더 작은 점 형태로 축소)
+        const MIN_SIZE = 10; // 가장 먼 식당 마커 크기
+        const MAX_SIZE = 16; // 가장 가까운 식당 마커 크기 (클러스터 풀렸을 때도 잘 보이도록)
 
         const restaurantMarkers = restaurants.map((restaurant) => {
           const position = new kakao.maps.LatLng(restaurant.lat, restaurant.lng);
