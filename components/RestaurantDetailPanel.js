@@ -257,7 +257,7 @@ export default function RestaurantDetailPanel({ restaurant, onClose, inline = fa
                     marginBottom: 14,
                   }}
                 >
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", fontSize: 13 }}>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", fontSize: 14 }}>
                     <span style={{ fontWeight: 700 }}>{review.nickname}</span>
                     <span style={{ color: "#999" }}>·</span>
                     <span style={{ color: "#555" }}>⏱ {joinValues(review.waiting)}</span>

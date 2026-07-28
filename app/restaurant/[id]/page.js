@@ -183,7 +183,7 @@ export default function RestaurantDetailPage() {
                 marginBottom: 12,
               }}
             >
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", fontSize: 12 }}>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", fontSize: 13 }}>
                 <span style={{ fontWeight: 700 }}>{review.nickname}</span>
                 <span style={{ color: "#999" }}>·</span>
                 <span style={{ color: "#666" }}>⏱ {joinValues(review.waiting)}</span>

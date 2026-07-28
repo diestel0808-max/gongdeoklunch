@@ -27,8 +27,8 @@ function joinValues(value) {
 // 필터가 "전체"가 아니라 실제로 적용중일 때 눈에 띄게 강조
 function filterSelectStyle(isActive) {
   return {
-    fontSize: 12,
-    padding: "6px 8px",
+    fontSize: 13,
+    padding: "7px 10px",
     borderRadius: 8,
     border: isActive ? "1px solid var(--color-teal)" : "1px solid var(--color-gray-300)",
     background: isActive ? "var(--color-teal-light)" : "#fff",
@@ -73,23 +73,25 @@ function RestaurantCard({ restaurant, onWriteReview, onOpenDetail }) {
       style={{
         border: "1px solid var(--color-gray-300)",
         borderRadius: 12,
-        padding: 14,
-        marginBottom: 10,
+        padding: 18,
+        marginBottom: 14,
       }}
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div>
-          <h2 style={{ fontSize: 15, fontWeight: 700 }}>{restaurant.name}</h2>
-          <p style={{ fontSize: 12, color: "#7a8288", marginTop: 2 }}>{restaurant.address}</p>
+          <h2 style={{ fontSize: 17, fontWeight: 700 }}>{restaurant.name}</h2>
+          <p style={{ fontSize: 13, color: "#7a8288", marginTop: 4, lineHeight: 1.4 }}>
+            {restaurant.address}
+          </p>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
           <span
             style={{
-              fontSize: 11,
+              fontSize: 12,
               fontWeight: 700,
               color: "var(--color-teal)",
               background: "var(--color-teal-light)",
-              padding: "3px 8px",
+              padding: "4px 10px",
               borderRadius: 6,
               flexShrink: 0,
             }}
@@ -102,7 +104,7 @@ function RestaurantCard({ restaurant, onWriteReview, onOpenDetail }) {
               display: "flex",
               alignItems: "center",
               gap: 4,
-              fontSize: 12,
+              fontSize: 13,
               fontWeight: 700,
               border: "none",
               background: "transparent",
@@ -111,7 +113,7 @@ function RestaurantCard({ restaurant, onWriteReview, onOpenDetail }) {
               padding: 0,
             }}
           >
-            <HeartIcon filled={favorited} size={16} /> {favoriteCount}
+            <HeartIcon filled={favorited} size={17} /> {favoriteCount}
           </button>
         </div>
       </div>
@@ -120,13 +122,13 @@ function RestaurantCard({ restaurant, onWriteReview, onOpenDetail }) {
         <span
           style={{
             display: "inline-block",
-            fontSize: 10,
+            fontSize: 11,
             fontWeight: 700,
             color: "#888",
             border: "1px solid var(--color-gray-300)",
-            padding: "1px 6px",
+            padding: "2px 7px",
             borderRadius: 4,
-            marginTop: 6,
+            marginTop: 8,
           }}
         >
           사용자 등록
@@ -136,11 +138,12 @@ function RestaurantCard({ restaurant, onWriteReview, onOpenDetail }) {
       <div
         style={{
           display: "flex",
-          gap: 10,
-          marginTop: 10,
-          fontSize: 12,
-          color: "#555",
+          gap: 12,
+          marginTop: 12,
+          fontSize: 13,
+          color: "#444",
           flexWrap: "wrap",
+          lineHeight: 1.6,
         }}
       >
         <span>
@@ -158,18 +161,18 @@ function RestaurantCard({ restaurant, onWriteReview, onOpenDetail }) {
         )}
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
         <a
           href={restaurant.kakaoMapUrl}
           target="_blank"
           rel="noreferrer"
           style={{
-            fontSize: 12,
+            fontSize: 13,
             fontWeight: 600,
             color: "var(--color-navy)",
             border: "1px solid var(--color-gray-300)",
             borderRadius: 6,
-            padding: "6px 10px",
+            padding: "7px 12px",
           }}
         >
           카카오맵에서 보기
@@ -177,12 +180,12 @@ function RestaurantCard({ restaurant, onWriteReview, onOpenDetail }) {
         <button
           onClick={() => onOpenDetail(restaurant)}
           style={{
-            fontSize: 12,
+            fontSize: 13,
             fontWeight: 600,
             color: "var(--color-navy)",
             border: "1px solid var(--color-gray-300)",
             borderRadius: 6,
-            padding: "6px 10px",
+            padding: "7px 12px",
             background: "#fff",
             cursor: "pointer",
           }}
@@ -192,13 +195,13 @@ function RestaurantCard({ restaurant, onWriteReview, onOpenDetail }) {
         <button
           onClick={() => onWriteReview(restaurant, refreshReviews)}
           style={{
-            fontSize: 12,
+            fontSize: 13,
             fontWeight: 600,
             color: "#fff",
             background: "var(--color-navy)",
             border: "none",
             borderRadius: 6,
-            padding: "6px 10px",
+            padding: "7px 12px",
             cursor: "pointer",
           }}
         >
@@ -206,7 +209,7 @@ function RestaurantCard({ restaurant, onWriteReview, onOpenDetail }) {
         </button>
         <button
           style={{
-            fontSize: 12,
+            fontSize: 13,
             color: "#aaa",
             background: "transparent",
             border: "none",
@@ -225,7 +228,7 @@ function RestaurantCard({ restaurant, onWriteReview, onOpenDetail }) {
             const liked = hasLikedReview(review);
             return (
               <div key={review.id} style={{ marginBottom: 10 }}>
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", fontSize: 11 }}>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", fontSize: 13 }}>
                   <span style={{ fontWeight: 700 }}>{review.nickname}</span>
                   <span style={{ color: "#999" }}>·</span>
                   <span style={{ color: "#666" }}>⏱ {joinValues(review.waiting)}</span>
@@ -235,12 +238,12 @@ function RestaurantCard({ restaurant, onWriteReview, onOpenDetail }) {
                   <span style={{ color: "#666" }}>🔁 {review.revisit}</span>
                 </div>
                 {review.menu && (
-                  <p style={{ fontSize: 12, marginTop: 4, color: "#0a8fa0", fontWeight: 600 }}>
+                  <p style={{ fontSize: 13, marginTop: 4, color: "#0a8fa0", fontWeight: 600 }}>
                     🍽 {review.menu}
                   </p>
                 )}
                 {review.comment && (
-                  <p style={{ fontSize: 12, marginTop: 4, color: "#333", whiteSpace: "pre-line" }}>{review.comment}</p>
+                  <p style={{ fontSize: 13, marginTop: 4, color: "#333", whiteSpace: "pre-line" }}>{review.comment}</p>
                 )}
                 <button
                   onClick={() => handleLike(review.id)}
@@ -518,9 +521,9 @@ export default function HomePage() {
               onClick={() => setActiveCategory(category)}
               style={{
                 flexShrink: 0,
-                padding: "6px 14px",
+                padding: "7px 16px",
                 borderRadius: 20,
-                fontSize: 13,
+                fontSize: 14,
                 fontWeight: 600,
                 border: isActive ? "none" : "1px solid var(--color-gray-300)",
                 background: isActive ? "var(--color-navy)" : "#fff",
