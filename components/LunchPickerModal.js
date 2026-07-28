@@ -98,11 +98,57 @@ function RestaurantResultCard({ restaurant, tagText, tagColor, onOpenDetail }) {
   );
 }
 
+// 여러 카테고리를 선택했을 때, 정렬만 하면 후기/거리 우세한 카테고리 하나가
+// 상위 10개를 독차지할 수 있음 (예: 한식이 압도적으로 많으면 일식은 하나도 안 보임).
+// 그래서 카테고리별로 그룹을 나눈 뒤 라운드로빈으로 섞어서, 선택한 카테고리들이
+// 골고루 노출되도록 합니다.
+function interleaveByCategory(sortedList) {
+  const buckets = new Map();
+  const order = [];
+
+  sortedList.forEach((item) => {
+    const cat = item.restaurant.category;
+    if (!buckets.has(cat)) {
+      buckets.set(cat, []);
+      order.push(cat);
+    }
+    buckets.get(cat).push(item);
+  });
+
+  const result = [];
+  let idx = 0;
+  while (result.length < sortedList.length) {
+    let addedAny = false;
+    for (const cat of order) {
+      const bucket = buckets.get(cat);
+      if (bucket[idx]) {
+        result.push(bucket[idx]);
+        addedAny = true;
+      }
+    }
+    idx += 1;
+    if (!addedAny) break;
+  }
+  return result;
+}
+
 // 슬롯머신처럼 점점 느려지며 멈추는 딜레이 간격(ms)
 const ROLL_DELAYS = [70, 70, 80, 90, 100, 120, 150, 190, 240, 300, 380];
 
 // 룰렛이 도는 동안 보여줄 음식 이모지 (실제 후보 이름은 숨기고 긴장감만 연출)
 const ROLL_EMOJIS = ["🍜", "🍣", "🍕", "🍔", "🥗", "🍱", "🍲", "🥘", "🌮", "🍛"];
+
+const rollScopeButtonStyle = {
+  display: "block",
+  width: "100%",
+  textAlign: "left",
+  padding: "12px 14px",
+  borderRadius: 10,
+  border: "1px solid var(--color-gray-300)",
+  background: "#fff",
+  marginBottom: 8,
+  cursor: "pointer",
+};
 
 export default function LunchPickerModal({ restaurants, onClose, onOpenDetail }) {
   const [step, setStep] = useState("form"); // form | result
@@ -112,7 +158,8 @@ export default function LunchPickerModal({ restaurants, onClose, onOpenDetail })
   const [companions, setCompanions] = useState([]);
   const [waitings, setWaitings] = useState([]);
 
-  const [pickerState, setPickerState] = useState("idle"); // idle | rolling | picked
+  const [pickerState, setPickerState] = useState("idle"); // idle | choose | rolling | picked
+  const [rollScope, setRollScope] = useState("categoryDistance");
   const [rollingEmoji, setRollingEmoji] = useState("🍜");
   const [pickedResult, setPickedResult] = useState(null);
   const lastPickedIdRef = useRef(null);
@@ -163,20 +210,26 @@ export default function LunchPickerModal({ restaurants, onClose, onOpenDetail })
 
     const hardMatchList = list.filter((r) => r.hardMatch);
 
-    const primary = hardMatchList
+    const primarySorted = hardMatchList
       .filter((r) => r.softMatched === totalSoftGroups)
       .sort((a, b) => {
         if (b.reviewCount !== a.reviewCount) return b.reviewCount - a.reviewCount;
         return a.restaurant.walkMinutes - b.restaurant.walkMinutes;
       });
 
-    const secondary =
+    // 카테고리를 2개 이상 골랐을 때만 섞기 적용 (1개면 어차피 전부 같은 카테고리)
+    const primary = categories.length > 1 ? interleaveByCategory(primarySorted) : primarySorted;
+
+    const secondarySorted =
       totalSoftGroups > 0
         ? hardMatchList
             .filter((r) => r.softMatched < totalSoftGroups)
             .sort((a, b) => a.restaurant.walkMinutes - b.restaurant.walkMinutes)
-            .slice(0, 6)
         : [];
+    const secondary =
+      categories.length > 1
+        ? interleaveByCategory(secondarySorted).slice(0, 6)
+        : secondarySorted.slice(0, 6);
 
     return {
       primary,
@@ -187,25 +240,32 @@ export default function LunchPickerModal({ restaurants, onClose, onOpenDetail })
     };
   }, [restaurants, categories, distances, prices, companions, waitings]);
 
-  // 룰렛 전용 후보 풀: 카테고리 선택과 무관하게 "거리" 조건만 반영합니다.
-  // (카테고리까지 걸어버리면 "오늘은 새로운 카테고리 도전"이 안 되니, 랜덤 뽑기는
-  // 최대한 넓은 범위에서 진짜 서프라이즈가 되도록 카테고리는 무시함)
-  const rollPool = useMemo(() => {
+  // 룰렛 후보 풀 계산 - 사용자가 고른 "기준"에 따라 카테고리/거리 반영 여부가 달라짐
+  const computeRollPool = (scope) => {
     const maxWalkMinutes = distances.length
       ? Math.max(...distances.map((d) => distanceOptions.find((o) => o.label === d).maxWalkMinutes))
       : null;
 
-    const pool = restaurants.filter(
-      (restaurant) => maxWalkMinutes === null || restaurant.walkMinutes <= maxWalkMinutes
-    );
+    let pool = restaurants;
+
+    if (scope === "categoryDistance") {
+      pool = restaurants.filter(
+        (r) =>
+          (categories.length === 0 || categories.includes(r.category)) &&
+          (maxWalkMinutes === null || r.walkMinutes <= maxWalkMinutes)
+      );
+    } else if (scope === "distanceOnly") {
+      pool = restaurants.filter((r) => maxWalkMinutes === null || r.walkMinutes <= maxWalkMinutes);
+    }
+    // scope === "any"면 카테고리/거리 둘 다 무시하고 전체 restaurants 그대로 사용
 
     return pool.length > 0 ? pool : restaurants;
-  }, [restaurants, distances]);
+  };
 
   const topPrimary = evaluated.primary.slice(0, 10);
 
-  const startRoll = () => {
-    let pool = rollPool;
+  const startRoll = (scope) => {
+    const pool = computeRollPool(scope);
     if (pool.length === 0) return;
 
     let candidatePool = pool.length > 1 ? pool.filter((r) => r.id !== lastPickedIdRef.current) : pool;
@@ -214,6 +274,7 @@ export default function LunchPickerModal({ restaurants, onClose, onOpenDetail })
     const finalPick = candidatePool[Math.floor(Math.random() * candidatePool.length)];
 
     if (rollTimeoutRef.current) clearTimeout(rollTimeoutRef.current);
+    setRollScope(scope);
     setPickerState("rolling");
     setPickedResult(null);
 
@@ -230,6 +291,10 @@ export default function LunchPickerModal({ restaurants, onClose, onOpenDetail })
     };
 
     runStep(0);
+  };
+
+  const openRollChooser = () => {
+    setPickerState("choose");
   };
 
   const handleClosePicker = () => {
@@ -307,81 +372,119 @@ export default function LunchPickerModal({ restaurants, onClose, onOpenDetail })
               ← 목록으로 돌아가기
             </button>
 
-            <div
-              style={{
-                border: "2px solid var(--color-teal)",
-                borderRadius: 16,
-                padding: "32px 16px",
-                textAlign: "center",
-                background: "var(--color-teal-light)",
-              }}
-            >
-              {pickerState === "rolling" && (
-                <>
-                  <p style={{ fontSize: 12, color: "#666", marginBottom: 12 }}>
-                    오늘의 점심을 뽑는 중...
-                  </p>
-                  <p
-                    style={{
-                      fontSize: 48,
-                      fontWeight: 800,
-                      color: "var(--color-navy)",
-                      animation: "lunchpicker-pulse 0.3s ease-in-out infinite",
-                    }}
-                  >
-                    {rollingEmoji}
-                  </p>
-                </>
-              )}
+            {pickerState === "choose" && (
+              <div>
+                <p style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>
+                  이 조건 안에서 뽑을까요?
+                </p>
+                <p style={{ fontSize: 12, color: "#999", marginBottom: 16 }}>
+                  랜덤 뽑기 범위를 골라주세요.
+                </p>
 
-              {pickerState === "picked" && pickedResult && (
-                <div style={{ animation: "lunchpicker-pop 0.25s ease-out" }}>
-                  <p style={{ fontSize: 12, color: "#666", marginBottom: 8 }}>오늘의 점심은!</p>
-                  <p style={{ fontSize: 24, fontWeight: 800, color: "var(--color-navy)" }}>
-                    🎉 {pickedResult.restaurant.name}
-                  </p>
-                  <p style={{ fontSize: 13, color: "#555", marginTop: 8 }}>
-                    {pickedResult.restaurant.category} · 도보 {pickedResult.restaurant.walkMinutes}
-                    분 · {pickedResult.restaurant.address}
-                  </p>
+                <button
+                  onClick={() => startRoll("categoryDistance")}
+                  style={rollScopeButtonStyle}
+                >
+                  <span style={{ fontWeight: 700 }}>🏷 카테고리+거리 반영</span>
+                  <span style={{ fontSize: 11, color: "#999", display: "block", marginTop: 2 }}>
+                    지금 고른 카테고리·거리 조건 안에서만 뽑기
+                  </span>
+                </button>
+                <button
+                  onClick={() => startRoll("distanceOnly")}
+                  style={rollScopeButtonStyle}
+                >
+                  <span style={{ fontWeight: 700 }}>📍 거리만 반영</span>
+                  <span style={{ fontSize: 11, color: "#999", display: "block", marginTop: 2 }}>
+                    카테고리는 무시하고, 거리 조건만 지켜서 뽑기
+                  </span>
+                </button>
+                <button onClick={() => startRoll("any")} style={rollScopeButtonStyle}>
+                  <span style={{ fontWeight: 700 }}>🎲 상관없이 전체</span>
+                  <span style={{ fontSize: 11, color: "#999", display: "block", marginTop: 2 }}>
+                    조건 다 무시하고 완전 랜덤으로 뽑기
+                  </span>
+                </button>
+              </div>
+            )}
 
-                  <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
-                    <button
-                      onClick={startRoll}
+            {(pickerState === "rolling" || pickerState === "picked") && (
+              <div
+                style={{
+                  border: "2px solid var(--color-teal)",
+                  borderRadius: 16,
+                  padding: "32px 16px",
+                  textAlign: "center",
+                  background: "var(--color-teal-light)",
+                }}
+              >
+                {pickerState === "rolling" && (
+                  <>
+                    <p style={{ fontSize: 12, color: "#666", marginBottom: 12 }}>
+                      오늘의 점심을 뽑는 중...
+                    </p>
+                    <p
                       style={{
-                        flex: 1,
-                        padding: "11px 0",
-                        borderRadius: 8,
-                        border: "1px solid var(--color-navy)",
-                        background: "#fff",
+                        fontSize: 48,
+                        fontWeight: 800,
                         color: "var(--color-navy)",
-                        fontWeight: 700,
-                        fontSize: 13,
-                        cursor: "pointer",
+                        animation: "lunchpicker-pulse 0.3s ease-in-out infinite",
                       }}
                     >
-                      🔁 다시 뽑기
-                    </button>
-                    <button
-                      onClick={() => onOpenDetail(pickedResult.restaurant)}
-                      style={{
-                        flex: 1,
-                        padding: "11px 0",
-                        borderRadius: 8,
-                        border: "none",
-                        background: "var(--color-navy)",
-                        color: "#fff",
-                        fontWeight: 700,
-                        fontSize: 13,
-                        cursor: "pointer",
-                      }}
-                    >
-                      ✅ 이걸로 결정!
-                    </button>
+                      {rollingEmoji}
+                    </p>
+                  </>
+                )}
+
+                {pickerState === "picked" && pickedResult && (
+                  <div style={{ animation: "lunchpicker-pop 0.25s ease-out" }}>
+                    <p style={{ fontSize: 12, color: "#666", marginBottom: 8 }}>오늘의 점심은!</p>
+                    <p style={{ fontSize: 24, fontWeight: 800, color: "var(--color-navy)" }}>
+                      🎉 {pickedResult.restaurant.name}
+                    </p>
+                    <p style={{ fontSize: 13, color: "#555", marginTop: 8 }}>
+                      {pickedResult.restaurant.category} · 도보 {pickedResult.restaurant.walkMinutes}
+                      분 · {pickedResult.restaurant.address}
+                    </p>
+
+                    <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
+                      <button
+                        onClick={() => startRoll(rollScope)}
+                        style={{
+                          flex: 1,
+                          padding: "11px 0",
+                          borderRadius: 8,
+                          border: "1px solid var(--color-navy)",
+                          background: "#fff",
+                          color: "var(--color-navy)",
+                          fontWeight: 700,
+                          fontSize: 13,
+                          cursor: "pointer",
+                        }}
+                      >
+                        🔁 다시 뽑기
+                      </button>
+                      <button
+                        onClick={() => onOpenDetail(pickedResult.restaurant)}
+                        style={{
+                          flex: 1,
+                          padding: "11px 0",
+                          borderRadius: 8,
+                          border: "none",
+                          background: "var(--color-navy)",
+                          color: "#fff",
+                          fontWeight: 700,
+                          fontSize: 13,
+                          cursor: "pointer",
+                        }}
+                      >
+                        🔎 상세 알아보기
+                      </button>
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
           </div>
         ) : (
           <>
@@ -444,7 +547,7 @@ export default function LunchPickerModal({ restaurants, onClose, onOpenDetail })
                 </button>
 
                 <button
-                  onClick={startRoll}
+                  onClick={openRollChooser}
                   style={{
                     width: "100%",
                     padding: "12px 0",
@@ -480,7 +583,7 @@ export default function LunchPickerModal({ restaurants, onClose, onOpenDetail })
                     ← 조건 다시 고르기
                   </button>
                   <button
-                    onClick={startRoll}
+                    onClick={openRollChooser}
                     style={{
                       fontSize: 12,
                       color: "var(--color-navy)",
