@@ -3,9 +3,10 @@
 import { useMemo, useRef, useState } from "react";
 import {
   CATEGORIES,
-  COMPANION_TAGS,
   DISTANCE_FILTER_OPTIONS,
+  GROUP_SIZE_OPTIONS,
   PRICE_RANGE_OPTIONS,
+  RECOMMENDED_FOR_OPTIONS,
   WAITING_LEVELS,
 } from "@/lib/constants";
 import { getRestaurantFilterData } from "@/lib/reviewStorage";
@@ -155,7 +156,8 @@ export default function LunchPickerModal({ restaurants, onClose, onOpenDetail })
   const [categories, setCategories] = useState([]);
   const [distances, setDistances] = useState([]);
   const [prices, setPrices] = useState([]);
-  const [companions, setCompanions] = useState([]);
+  const [headcounts, setHeadcounts] = useState([]);
+  const [recommendedFors, setRecommendedFors] = useState([]);
   const [waitings, setWaitings] = useState([]);
 
   const [pickerState, setPickerState] = useState("idle"); // idle | choose | rolling | picked
@@ -186,9 +188,12 @@ export default function LunchPickerModal({ restaurants, onClose, onOpenDetail })
       ? Math.max(...distances.map((d) => distanceOptions.find((o) => o.label === d).maxWalkMinutes))
       : null;
 
-    const totalSoftGroups = [prices.length > 0, companions.length > 0, waitings.length > 0].filter(
-      Boolean
-    ).length;
+    const totalSoftGroups = [
+      prices.length > 0,
+      headcounts.length > 0,
+      recommendedFors.length > 0,
+      waitings.length > 0,
+    ].filter(Boolean).length;
     const totalHardGroups = [categories.length > 0, distances.length > 0].filter(Boolean).length;
 
     const list = restaurants.map((restaurant) => {
@@ -196,13 +201,17 @@ export default function LunchPickerModal({ restaurants, onClose, onOpenDetail })
         (categories.length === 0 || categories.includes(restaurant.category)) &&
         (maxWalkMinutes === null || restaurant.walkMinutes <= maxWalkMinutes);
 
-      const { waitingSet, companionSet, priceRangeSet, reviewCount } = getRestaurantFilterData(
-        restaurant.id
-      );
+      const { waitingSet, headcountSet, recommendedForSet, priceRangeSet, reviewCount } =
+        getRestaurantFilterData(restaurant.id);
 
       let softMatched = 0;
       if (prices.length > 0 && prices.some((p) => priceRangeSet.has(p))) softMatched += 1;
-      if (companions.length > 0 && companions.some((c) => companionSet.has(c))) softMatched += 1;
+      if (headcounts.length > 0 && headcounts.some((h) => headcountSet.has(h))) softMatched += 1;
+      if (
+        recommendedFors.length > 0 &&
+        recommendedFors.some((r) => recommendedForSet.has(r))
+      )
+        softMatched += 1;
       if (waitings.length > 0 && waitings.some((w) => waitingSet.has(w))) softMatched += 1;
 
       return { restaurant, hardMatch, softMatched, reviewCount };
@@ -238,7 +247,7 @@ export default function LunchPickerModal({ restaurants, onClose, onOpenDetail })
       totalConditions: totalHardGroups + totalSoftGroups,
       totalSoftGroups,
     };
-  }, [restaurants, categories, distances, prices, companions, waitings]);
+  }, [restaurants, categories, distances, prices, headcounts, recommendedFors, waitings]);
 
   // 룰렛 후보 풀 계산 - 사용자가 고른 "기준"에 따라 카테고리/거리 반영 여부가 달라짐
   const computeRollPool = (scope) => {
@@ -514,10 +523,17 @@ export default function LunchPickerModal({ restaurants, onClose, onOpenDetail })
                   hint="(후기 기반)"
                 />
                 <MultiChipGroup
-                  label="추천 동행"
-                  options={COMPANION_TAGS}
-                  values={companions}
-                  onToggle={(v) => toggle(companions, setCompanions, v)}
+                  label="인원수"
+                  options={GROUP_SIZE_OPTIONS}
+                  values={headcounts}
+                  onToggle={(v) => toggle(headcounts, setHeadcounts, v)}
+                  hint="(후기 기반)"
+                />
+                <MultiChipGroup
+                  label="추천 대상"
+                  options={RECOMMENDED_FOR_OPTIONS}
+                  values={recommendedFors}
+                  onToggle={(v) => toggle(recommendedFors, setRecommendedFors, v)}
                   hint="(후기 기반)"
                 />
                 <MultiChipGroup

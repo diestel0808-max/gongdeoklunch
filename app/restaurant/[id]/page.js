@@ -104,7 +104,7 @@ export default function RestaurantDetailPage() {
           </span>
           {restaurant.phone && <span>📞 {restaurant.phone}</span>}
           <span>💰 가격대: {summary?.topPriceRange || restaurant.priceRange}</span>
-          <span>👥 함께 가기 좋은 인원: {summary?.topCompanion || restaurant.groupSize}</span>
+          <span>👥 함께 가기 좋은 인원: {summary?.topHeadcount || restaurant.groupSize}</span>
         </div>
 
         {/* 후기 요약 */}
@@ -123,7 +123,8 @@ export default function RestaurantDetailPage() {
           >
             <span>📝 후기 {summary.count}개</span>
             {summary.topWaiting && <span>⏱ 주로 "{summary.topWaiting}"</span>}
-            {summary.topCompanion && <span>👥 "{summary.topCompanion}" 추천 많음</span>}
+            {summary.topHeadcount && <span>👤 "{summary.topHeadcount}" 인원 많음</span>}
+            {summary.topRecommendedFor && <span>👥 "{summary.topRecommendedFor}" 추천 많음</span>}
           </div>
         )}
 
@@ -186,7 +187,8 @@ export default function RestaurantDetailPage() {
                 <span style={{ fontWeight: 700 }}>{review.nickname}</span>
                 <span style={{ color: "#999" }}>·</span>
                 <span style={{ color: "#666" }}>⏱ {joinValues(review.waiting)}</span>
-                <span style={{ color: "#666" }}>👥 {joinValues(review.companion)}</span>
+                <span style={{ color: "#666" }}>👤 {joinValues(review.headcount)}</span>
+                <span style={{ color: "#666" }}>👥 {joinValues(review.recommendedFor)}</span>
                 <span style={{ color: "#666" }}>💰 {review.priceRange} ({review.priceFeel})</span>
                 <span style={{ color: "#666" }}>🔁 {review.revisit}</span>
               </div>

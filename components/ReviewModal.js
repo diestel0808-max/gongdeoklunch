@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import {
-  COMPANION_TAGS,
+  GROUP_SIZE_OPTIONS,
   PRICE_FEEL_OPTIONS,
   PRICE_RANGE_OPTIONS,
+  RECOMMENDED_FOR_OPTIONS,
   REVISIT_OPTIONS,
   WAITING_LEVELS,
 } from "@/lib/constants";
@@ -75,7 +76,8 @@ export default function ReviewModal({ restaurant, onClose, onSubmitted }) {
   const [pinInput, setPinInput] = useState(existingProfile?.pin || "");
 
   const [waiting, setWaiting] = useState([]);
-  const [companion, setCompanion] = useState([]);
+  const [headcount, setHeadcount] = useState([]);
+  const [recommendedFor, setRecommendedFor] = useState([]);
   const [priceRange, setPriceRange] = useState("");
   const [priceFeel, setPriceFeel] = useState("");
   const [revisit, setRevisit] = useState("");
@@ -112,9 +114,16 @@ export default function ReviewModal({ restaurant, onClose, onSubmitted }) {
       setErrorMessage("먼저 닉네임과 PIN을 설정해주세요.");
       return;
     }
-    if (waiting.length === 0 || companion.length === 0 || !priceRange || !priceFeel || !revisit) {
+    if (
+      waiting.length === 0 ||
+      headcount.length === 0 ||
+      recommendedFor.length === 0 ||
+      !priceRange ||
+      !priceFeel ||
+      !revisit
+    ) {
       setErrorMessage(
-        "웨이팅 / 추천 동행 / 가격대 / 가격 체감 / 재방문 의사를 모두 선택해주세요."
+        "웨이팅 / 인원수 / 추천 대상 / 가격대 / 가격 체감 / 재방문 의사를 모두 선택해주세요."
       );
       return;
     }
@@ -122,7 +131,8 @@ export default function ReviewModal({ restaurant, onClose, onSubmitted }) {
     addReview(restaurant.id, {
       nickname: profile.nickname,
       waiting,
-      companion,
+      headcount,
+      recommendedFor,
       priceRange,
       priceFeel,
       revisit,
@@ -264,10 +274,16 @@ export default function ReviewModal({ restaurant, onClose, onSubmitted }) {
           onToggle={(v) => toggleValue(waiting, setWaiting, v)}
         />
         <MultiChipGroup
-          label="추천 동행"
-          options={COMPANION_TAGS}
-          values={companion}
-          onToggle={(v) => toggleValue(companion, setCompanion, v)}
+          label="인원수"
+          options={GROUP_SIZE_OPTIONS}
+          values={headcount}
+          onToggle={(v) => toggleValue(headcount, setHeadcount, v)}
+        />
+        <MultiChipGroup
+          label="추천 대상"
+          options={RECOMMENDED_FOR_OPTIONS}
+          values={recommendedFor}
+          onToggle={(v) => toggleValue(recommendedFor, setRecommendedFor, v)}
         />
         <SingleChipGroup
           label="가격대 (1인 기준)"

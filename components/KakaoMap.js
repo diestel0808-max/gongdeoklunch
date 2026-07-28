@@ -4,18 +4,25 @@ import { useEffect, useRef, useState } from "react";
 import { OFFICE } from "@/lib/constants";
 import { loadKakaoMapScript } from "@/lib/kakaoLoader";
 
-// 거리 비율(0=가까움, 1=멂)에 따라 크기가 다른 원형 마커 이미지를 만듦
-// 가까운 식당일수록 크고 진하게, 먼 식당일수록 작게 보여서 한눈에 원근감이 느껴지도록 함
-function buildRestaurantMarkerImage(kakao, sizePx) {
-  const half = sizePx / 2;
+// 거리 비율(0=가까움, 1=멂)에 따라 아주 살짝 크기가 다른 작은 점 마커 이미지를 만듦
+// (예전엔 가까울수록 크게 키웠는데, 지도 위에서 너무 두드러져 지저분해 보여서
+// 이제는 전체적으로 작은 점 형태로 줄이고 차이도 미세하게만 둠)
+//
+// 화면에 보이는 점은 작지만, 탭(클릭) 가능한 영역은 그보다 넓게 잡아서
+// 모바일에서도 손가락으로 정확히 누르기 쉽도록 투명한 여백을 둘레에 둡니다.
+function buildRestaurantMarkerImage(kakao, visibleSizePx) {
+  const canvasSize = visibleSizePx + 20; // 실제 터치 가능 영역 (투명 여백 포함)
+  const center = canvasSize / 2;
+  const radius = visibleSizePx / 2 - 1;
+
   const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="${sizePx}" height="${sizePx}" viewBox="0 0 ${sizePx} ${sizePx}">
-      <circle cx="${half}" cy="${half}" r="${half - 2}" fill="#1bc5d8" stroke="#ffffff" stroke-width="2"/>
+    <svg xmlns="http://www.w3.org/2000/svg" width="${canvasSize}" height="${canvasSize}" viewBox="0 0 ${canvasSize} ${canvasSize}">
+      <circle cx="${center}" cy="${center}" r="${radius}" fill="#1bc5d8" stroke="#ffffff" stroke-width="1"/>
     </svg>`;
   return new kakao.maps.MarkerImage(
     `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`,
-    new kakao.maps.Size(sizePx, sizePx),
-    { offset: new kakao.maps.Point(half, half) }
+    new kakao.maps.Size(canvasSize, canvasSize),
+    { offset: new kakao.maps.Point(center, center) }
   );
 }
 
@@ -70,10 +77,10 @@ export default function KakaoMap({ restaurants = [], onMarkerClick }) {
 
         // 거리 정규화를 위한 최댓값 (0으로 나누는 것 방지)
         const maxDistance = Math.max(...restaurants.map((r) => r.distanceMeters || 0), 1);
-        const MIN_SIZE = 14; // 가장 먼 식당 마커 크기
-        const MAX_SIZE = 32; // 가장 가까운 식당 마커 크기
+        const MIN_SIZE = 5; // 가장 먼 식당 마커 크기
+        const MAX_SIZE = 8; // 가장 가까운 식당 마커 크기 (더 작은 점 형태로 축소)
 
-        restaurants.forEach((restaurant) => {
+        const restaurantMarkers = restaurants.map((restaurant) => {
           const position = new kakao.maps.LatLng(restaurant.lat, restaurant.lng);
 
           const ratio = Math.min((restaurant.distanceMeters || 0) / maxDistance, 1);
@@ -81,7 +88,6 @@ export default function KakaoMap({ restaurants = [], onMarkerClick }) {
 
           const marker = new kakao.maps.Marker({
             position,
-            map,
             image: buildRestaurantMarkerImage(kakao, sizePx),
             zIndex: Math.round(10 - ratio * 5), // 가까운 마커가 먼 마커 위에 그려지도록
           });
@@ -96,7 +102,48 @@ export default function KakaoMap({ restaurants = [], onMarkerClick }) {
           if (onMarkerClick) {
             kakao.maps.event.addListener(marker, "click", () => onMarkerClick(restaurant));
           }
+
+          return marker;
         });
+
+        // 식당이 여러 곳이고 밀집된 지역에서는 점들이 서로 겹쳐서 누르기 어려우므로,
+        // 카카오 클러스터러로 가까운 마커들을 숫자 뭉치로 묶어서 보여줍니다.
+        // 확대(줌인)하면 클러스터가 자동으로 풀리면서 개별 마커가 눌리기 쉬운 간격으로 흩어져요.
+        if (restaurantMarkers.length > 1) {
+          const clusterer = new kakao.maps.MarkerClusterer({
+            map,
+            averageCenter: true,
+            minLevel: 4, // 이 레벨보다 축소된(숫자가 큰) 상태에서만 클러스터로 묶임
+            gridSize: 60,
+            styles: [
+              {
+                width: "34px",
+                height: "34px",
+                background: "rgba(27,42,52,0.85)",
+                color: "#fff",
+                borderRadius: "17px",
+                textAlign: "center",
+                lineHeight: "34px",
+                fontSize: "12px",
+                fontWeight: "700",
+              },
+              {
+                width: "42px",
+                height: "42px",
+                background: "rgba(27,42,52,0.9)",
+                color: "#fff",
+                borderRadius: "21px",
+                textAlign: "center",
+                lineHeight: "42px",
+                fontSize: "13px",
+                fontWeight: "700",
+              },
+            ],
+          });
+          clusterer.addMarkers(restaurantMarkers);
+        } else {
+          restaurantMarkers.forEach((marker) => marker.setMap(map));
+        }
 
         // 식당이 1곳뿐인 경우(상세페이지)만 회사-식당 두 지점 기준으로 범위를 맞추고,
         // 여러 곳일 때(홈 화면 전체 지도)는 좌표 이상치 하나 때문에 지도가 서울 전체로

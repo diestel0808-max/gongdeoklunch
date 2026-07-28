@@ -6,7 +6,7 @@ import KakaoMap from "@/components/KakaoMap";
 import LunchPickerModal from "@/components/LunchPickerModal";
 import ReviewModal from "@/components/ReviewModal";
 import RestaurantDetailPanel from "@/components/RestaurantDetailPanel";
-import { CATEGORIES, COMPANION_TAGS, DISTANCE_FILTER_OPTIONS, OFFICE, PRICE_RANGE_OPTIONS, WAITING_LEVELS } from "@/lib/constants";
+import { CATEGORIES, DISTANCE_FILTER_OPTIONS, GROUP_SIZE_OPTIONS, OFFICE, PRICE_RANGE_OPTIONS, RECOMMENDED_FOR_OPTIONS, WAITING_LEVELS } from "@/lib/constants";
 import { getCustomRestaurants } from "@/lib/customRestaurantStorage";
 import {
   getReviewsForRestaurant,
@@ -117,7 +117,8 @@ function RestaurantCard({ restaurant, onWriteReview, onOpenDetail }) {
         {summary ? (
           <>
             {summary.topWaiting && <span>⏱ {summary.topWaiting}</span>}
-            {summary.topCompanion && <span>👥 {summary.topCompanion} 추천</span>}
+            {summary.topHeadcount && <span>👤 {summary.topHeadcount}</span>}
+            {summary.topRecommendedFor && <span>👥 {summary.topRecommendedFor} 추천</span>}
             {summary.topPriceRange && <span>💰 {summary.topPriceRange}</span>}
           </>
         ) : (
@@ -196,7 +197,8 @@ function RestaurantCard({ restaurant, onWriteReview, onOpenDetail }) {
                   <span style={{ fontWeight: 700 }}>{review.nickname}</span>
                   <span style={{ color: "#999" }}>·</span>
                   <span style={{ color: "#666" }}>⏱ {joinValues(review.waiting)}</span>
-                  <span style={{ color: "#666" }}>👥 {joinValues(review.companion)}</span>
+                  <span style={{ color: "#666" }}>👤 {joinValues(review.headcount)}</span>
+                  <span style={{ color: "#666" }}>👥 {joinValues(review.recommendedFor)}</span>
                   <span style={{ color: "#666" }}>💰 {review.priceRange} ({review.priceFeel})</span>
                   <span style={{ color: "#666" }}>🔁 {review.revisit}</span>
                 </div>
@@ -241,7 +243,8 @@ export default function HomePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [distanceFilter, setDistanceFilter] = useState("전체");
   const [priceFilter, setPriceFilter] = useState("전체");
-  const [companionFilter, setCompanionFilter] = useState("전체");
+  const [headcountFilter, setHeadcountFilter] = useState("전체");
+  const [recommendedForFilter, setRecommendedForFilter] = useState("전체");
   const [waitingFilter, setWaitingFilter] = useState("전체");
   const [apiRestaurants, setApiRestaurants] = useState([]);
   const [customRestaurants, setCustomRestaurants] = useState([]);
@@ -313,19 +316,36 @@ export default function HomePage() {
       list = list.filter((r) => r.walkMinutes <= distanceOption.maxWalkMinutes);
     }
 
-    // 가격대 / 추천 동행 / 웨이팅 필터 - 후기 데이터 기준이라, 후기가 없는 곳은 이 필터들에서 제외됨
-    if (priceFilter !== "전체" || companionFilter !== "전체" || waitingFilter !== "전체") {
+    // 가격대 / 인원수 / 추천대상 / 웨이팅 필터 - 후기 데이터 기준이라, 후기가 없는 곳은 이 필터들에서 제외됨
+    if (
+      priceFilter !== "전체" ||
+      headcountFilter !== "전체" ||
+      recommendedForFilter !== "전체" ||
+      waitingFilter !== "전체"
+    ) {
       list = list.filter((r) => {
-        const { waitingSet, companionSet, priceRangeSet } = getRestaurantFilterData(r.id);
+        const { waitingSet, headcountSet, recommendedForSet, priceRangeSet } =
+          getRestaurantFilterData(r.id);
         if (priceFilter !== "전체" && !priceRangeSet.has(priceFilter)) return false;
-        if (companionFilter !== "전체" && !companionSet.has(companionFilter)) return false;
+        if (headcountFilter !== "전체" && !headcountSet.has(headcountFilter)) return false;
+        if (recommendedForFilter !== "전체" && !recommendedForSet.has(recommendedForFilter))
+          return false;
         if (waitingFilter !== "전체" && !waitingSet.has(waitingFilter)) return false;
         return true;
       });
     }
 
     return list;
-  }, [restaurants, activeCategory, searchQuery, distanceFilter, priceFilter, companionFilter, waitingFilter]);
+  }, [
+    restaurants,
+    activeCategory,
+    searchQuery,
+    distanceFilter,
+    priceFilter,
+    headcountFilter,
+    recommendedForFilter,
+    waitingFilter,
+  ]);
 
   return (
     <main style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
@@ -467,14 +487,27 @@ export default function HomePage() {
         </select>
 
         <select
-          value={companionFilter}
-          onChange={(e) => setCompanionFilter(e.target.value)}
-          style={filterSelectStyle(companionFilter !== "전체")}
+          value={headcountFilter}
+          onChange={(e) => setHeadcountFilter(e.target.value)}
+          style={filterSelectStyle(headcountFilter !== "전체")}
         >
-          <option value="전체">인원: 전체</option>
-          {COMPANION_TAGS.map((o) => (
+          <option value="전체">인원수: 전체</option>
+          {GROUP_SIZE_OPTIONS.map((o) => (
             <option key={o} value={o}>
-              인원: {o}
+              인원수: {o}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={recommendedForFilter}
+          onChange={(e) => setRecommendedForFilter(e.target.value)}
+          style={filterSelectStyle(recommendedForFilter !== "전체")}
+        >
+          <option value="전체">추천대상: 전체</option>
+          {RECOMMENDED_FOR_OPTIONS.map((o) => (
+            <option key={o} value={o}>
+              추천대상: {o}
             </option>
           ))}
         </select>
@@ -492,11 +525,15 @@ export default function HomePage() {
           ))}
         </select>
 
-        {(priceFilter !== "전체" || companionFilter !== "전체" || waitingFilter !== "전체") && (
+        {(priceFilter !== "전체" ||
+          headcountFilter !== "전체" ||
+          recommendedForFilter !== "전체" ||
+          waitingFilter !== "전체") && (
           <button
             onClick={() => {
               setPriceFilter("전체");
-              setCompanionFilter("전체");
+              setHeadcountFilter("전체");
+              setRecommendedForFilter("전체");
               setWaitingFilter("전체");
             }}
             style={{
@@ -513,9 +550,12 @@ export default function HomePage() {
         )}
       </div>
 
-      {(priceFilter !== "전체" || companionFilter !== "전체" || waitingFilter !== "전체") && (
+      {(priceFilter !== "전체" ||
+        headcountFilter !== "전체" ||
+        recommendedForFilter !== "전체" ||
+        waitingFilter !== "전체") && (
         <p style={{ fontSize: 11, color: "#999", padding: "0 16px 8px" }}>
-          가격/인원/웨이팅 필터는 후기가 등록된 식당에서만 적용돼요.
+          가격/인원수/추천대상/웨이팅 필터는 후기가 등록된 식당에서만 적용돼요.
         </p>
       )}
 
