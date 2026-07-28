@@ -44,8 +44,7 @@ function MultiChipGroup({ label, options, values, onToggle, hint }) {
   );
 }
 
-function RestaurantResultCard({ result, totalConditions, onOpenDetail }) {
-  const { restaurant, matchedCount } = result;
+function RestaurantResultCard({ restaurant, tagText, tagColor, onOpenDetail }) {
   return (
     <div
       style={{
@@ -74,9 +73,9 @@ function RestaurantResultCard({ result, totalConditions, onOpenDetail }) {
       <p style={{ fontSize: 12, color: "#7a8288", marginTop: 4 }}>
         🚶 도보 {restaurant.walkMinutes}분 · {restaurant.address}
       </p>
-      {totalConditions > 0 && (
-        <p style={{ fontSize: 11, color: "var(--color-navy)", fontWeight: 700, marginTop: 4 }}>
-          🎯 조건 {matchedCount}/{totalConditions} 일치
+      {tagText && (
+        <p style={{ fontSize: 11, color: tagColor || "var(--color-navy)", fontWeight: 700, marginTop: 4 }}>
+          {tagText}
         </p>
       )}
       <button
@@ -126,59 +125,90 @@ export default function LunchPickerModal({ restaurants, onClose, onOpenDetail })
     setList(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
   };
 
-  const rankedResults = useMemo(() => {
+  // ---------------------------------------------------------------
+  // 조건을 두 종류로 나눠서 계산합니다.
+  // - "하드 조건" (카테고리/거리): 카카오 API 좌표로 항상 정확히 계산되는 조건
+  // - "소프트 조건" (가격/인원/웨이팅): 후기가 있어야만 확인 가능한 조건
+  //
+  // 이렇게 나누는 이유: 후기가 아직 없는 식당은 소프트 조건을 애초에 만족할 방법이
+  // 없어서, 하드+소프트를 한꺼번에 걸면 후기 있는 곳만 계속 뽑히는 문제가 있었어요.
+  // 그래서 하드 조건만 만족하는 곳도 "새로운 곳 도전" 섹션으로 따로 보여줍니다.
+  // ---------------------------------------------------------------
+  const evaluated = useMemo(() => {
     const maxWalkMinutes = distances.length
       ? Math.max(...distances.map((d) => distanceOptions.find((o) => o.label === d).maxWalkMinutes))
       : null;
 
-    const selectedGroups = [
-      categories.length > 0,
-      distances.length > 0,
-      prices.length > 0,
-      companions.length > 0,
-      waitings.length > 0,
-    ].filter(Boolean).length;
+    const totalSoftGroups = [prices.length > 0, companions.length > 0, waitings.length > 0].filter(
+      Boolean
+    ).length;
+    const totalHardGroups = [categories.length > 0, distances.length > 0].filter(Boolean).length;
 
-    const scored = restaurants.map((restaurant) => {
+    const list = restaurants.map((restaurant) => {
+      const hardMatch =
+        (categories.length === 0 || categories.includes(restaurant.category)) &&
+        (maxWalkMinutes === null || restaurant.walkMinutes <= maxWalkMinutes);
+
       const { waitingSet, companionSet, priceRangeSet, reviewCount } = getRestaurantFilterData(
         restaurant.id
       );
 
-      let matchedCount = 0;
-      if (categories.length > 0 && categories.includes(restaurant.category)) matchedCount += 1;
-      if (maxWalkMinutes !== null && restaurant.walkMinutes <= maxWalkMinutes) matchedCount += 1;
-      if (prices.length > 0 && prices.some((p) => priceRangeSet.has(p))) matchedCount += 1;
-      if (companions.length > 0 && companions.some((c) => companionSet.has(c))) matchedCount += 1;
-      if (waitings.length > 0 && waitings.some((w) => waitingSet.has(w))) matchedCount += 1;
+      let softMatched = 0;
+      if (prices.length > 0 && prices.some((p) => priceRangeSet.has(p))) softMatched += 1;
+      if (companions.length > 0 && companions.some((c) => companionSet.has(c))) softMatched += 1;
+      if (waitings.length > 0 && waitings.some((w) => waitingSet.has(w))) softMatched += 1;
 
-      return { restaurant, matchedCount, reviewCount };
+      return { restaurant, hardMatch, softMatched, reviewCount };
     });
 
-    scored.sort((a, b) => {
-      if (b.matchedCount !== a.matchedCount) return b.matchedCount - a.matchedCount;
-      if (b.reviewCount !== a.reviewCount) return b.reviewCount - a.reviewCount;
-      return a.restaurant.walkMinutes - b.restaurant.walkMinutes;
-    });
+    const hardMatchList = list.filter((r) => r.hardMatch);
 
-    return { scored, totalConditions: selectedGroups };
+    const primary = hardMatchList
+      .filter((r) => r.softMatched === totalSoftGroups)
+      .sort((a, b) => {
+        if (b.reviewCount !== a.reviewCount) return b.reviewCount - a.reviewCount;
+        return a.restaurant.walkMinutes - b.restaurant.walkMinutes;
+      });
+
+    const secondary =
+      totalSoftGroups > 0
+        ? hardMatchList
+            .filter((r) => r.softMatched < totalSoftGroups)
+            .sort((a, b) => a.restaurant.walkMinutes - b.restaurant.walkMinutes)
+            .slice(0, 6)
+        : [];
+
+    return {
+      primary,
+      secondary,
+      hardMatchList,
+      totalConditions: totalHardGroups + totalSoftGroups,
+      totalSoftGroups,
+    };
   }, [restaurants, categories, distances, prices, companions, waitings]);
 
-  const topResults = rankedResults.scored.slice(0, 10);
-  const hasAnyReviewCondition = prices.length > 0 || companions.length > 0 || waitings.length > 0;
+  // 룰렛 전용 후보 풀: 카테고리 선택과 무관하게 "거리" 조건만 반영합니다.
+  // (카테고리까지 걸어버리면 "오늘은 새로운 카테고리 도전"이 안 되니, 랜덤 뽑기는
+  // 최대한 넓은 범위에서 진짜 서프라이즈가 되도록 카테고리는 무시함)
+  const rollPool = useMemo(() => {
+    const maxWalkMinutes = distances.length
+      ? Math.max(...distances.map((d) => distanceOptions.find((o) => o.label === d).maxWalkMinutes))
+      : null;
+
+    const pool = restaurants.filter(
+      (restaurant) => maxWalkMinutes === null || restaurant.walkMinutes <= maxWalkMinutes
+    );
+
+    return pool.length > 0 ? pool : restaurants;
+  }, [restaurants, distances]);
+
+  const topPrimary = evaluated.primary.slice(0, 10);
 
   const startRoll = () => {
-    if (rankedResults.scored.length === 0) return;
+    let pool = rollPool;
+    if (pool.length === 0) return;
 
-    const topScore = rankedResults.scored[0].matchedCount;
-    // 조건을 하나도 안 골랐으면 topScore가 모두 0이라 사실상 전체 식당이 풀이 됨.
-    // (이전엔 여기서 상위 8개로 잘라서, 후기순 정렬 특성상 후기 있는 곳 위주로만
-    // 돌아가는 것처럼 보이는 문제가 있었음 - 이제 매칭 조건을 만족하는 곳 전체를
-    // 공정하게 풀에 넣음)
-    let pool = rankedResults.scored.filter((r) => r.matchedCount === topScore);
-    if (pool.length === 0) pool = rankedResults.scored;
-
-    let candidatePool =
-      pool.length > 1 ? pool.filter((r) => r.restaurant.id !== lastPickedIdRef.current) : pool;
+    let candidatePool = pool.length > 1 ? pool.filter((r) => r.id !== lastPickedIdRef.current) : pool;
     if (candidatePool.length === 0) candidatePool = pool;
 
     const finalPick = candidatePool[Math.floor(Math.random() * candidatePool.length)];
@@ -188,13 +218,11 @@ export default function LunchPickerModal({ restaurants, onClose, onOpenDetail })
     setPickedResult(null);
 
     const runStep = (idx) => {
-      // 룰렛이 도는 동안엔 실제 식당 이름 대신 음식 이모지만 랜덤하게 보여줘서
-      // 어떤 후보들이 있는지 미리 다 드러나지 않게 함 (긴장감/서프라이즈 유지)
       setRollingEmoji(ROLL_EMOJIS[Math.floor(Math.random() * ROLL_EMOJIS.length)]);
 
       if (idx >= ROLL_DELAYS.length) {
-        lastPickedIdRef.current = finalPick.restaurant.id;
-        setPickedResult(finalPick);
+        lastPickedIdRef.current = finalPick.id;
+        setPickedResult({ restaurant: finalPick });
         setPickerState("picked");
         return;
       }
@@ -469,33 +497,56 @@ export default function LunchPickerModal({ restaurants, onClose, onOpenDetail })
                 </div>
 
                 <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>
-                  추천 후보 {topResults.length}곳
+                  추천 후보 {topPrimary.length}곳
                 </p>
-                {rankedResults.totalConditions > 0 && (
-                  <p style={{ fontSize: 11, color: "#999", marginBottom: 4 }}>
-                    조건을 가장 많이 만족하는 곳부터 순서대로 보여드려요.
-                  </p>
-                )}
-                {hasAnyReviewCondition && (
+                {evaluated.totalConditions > 0 && (
                   <p style={{ fontSize: 11, color: "#999", marginBottom: 12 }}>
-                    가격/인원/웨이팅 조건은 후기가 등록된 식당에서만 확인 가능해요.
+                    조건에 딱 맞는 곳부터, 후기 많은 순으로 보여드려요.
                   </p>
                 )}
 
-                {topResults.length === 0 && (
+                {topPrimary.length === 0 && evaluated.secondary.length === 0 && (
                   <p style={{ fontSize: 13, color: "#999", padding: "24px 0" }}>
                     추천할 식당이 없어요. 조건을 조금 줄여서 다시 시도해보세요.
                   </p>
                 )}
 
-                {topResults.map((result) => (
+                {topPrimary.map(({ restaurant }) => (
                   <RestaurantResultCard
-                    key={result.restaurant.id}
-                    result={result}
-                    totalConditions={rankedResults.totalConditions}
+                    key={restaurant.id}
+                    restaurant={restaurant}
+                    tagText={evaluated.totalConditions > 0 ? "✅ 조건에 딱 맞아요" : null}
                     onOpenDetail={onOpenDetail}
                   />
                 ))}
+
+                {evaluated.secondary.length > 0 && (
+                  <>
+                    <p
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 700,
+                        marginTop: topPrimary.length > 0 ? 20 : 0,
+                        marginBottom: 4,
+                      }}
+                    >
+                      🌱 이런 새로운 곳은 어때요?
+                    </p>
+                    <p style={{ fontSize: 11, color: "#999", marginBottom: 12 }}>
+                      같은 카테고리·거리 조건은 맞지만, 아직 후기가 없어서 가격/인원/웨이팅까지는
+                      확인 못한 곳이에요. 한 번 도전해보는 건 어떨까요?
+                    </p>
+                    {evaluated.secondary.map(({ restaurant }) => (
+                      <RestaurantResultCard
+                        key={restaurant.id}
+                        restaurant={restaurant}
+                        tagText="🌱 아직 후기 없음 · 새로운 도전"
+                        tagColor="#0a8fa0"
+                        onOpenDetail={onOpenDetail}
+                      />
+                    ))}
+                  </>
+                )}
               </>
             )}
           </>

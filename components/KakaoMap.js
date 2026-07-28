@@ -4,6 +4,21 @@ import { useEffect, useRef, useState } from "react";
 import { OFFICE } from "@/lib/constants";
 import { loadKakaoMapScript } from "@/lib/kakaoLoader";
 
+// 거리 비율(0=가까움, 1=멂)에 따라 크기가 다른 원형 마커 이미지를 만듦
+// 가까운 식당일수록 크고 진하게, 먼 식당일수록 작게 보여서 한눈에 원근감이 느껴지도록 함
+function buildRestaurantMarkerImage(kakao, sizePx) {
+  const half = sizePx / 2;
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="${sizePx}" height="${sizePx}" viewBox="0 0 ${sizePx} ${sizePx}">
+      <circle cx="${half}" cy="${half}" r="${half - 2}" fill="#1bc5d8" stroke="#ffffff" stroke-width="2"/>
+    </svg>`;
+  return new kakao.maps.MarkerImage(
+    `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`,
+    new kakao.maps.Size(sizePx, sizePx),
+    { offset: new kakao.maps.Point(half, half) }
+  );
+}
+
 // restaurants: 지도에 표시할 식당 목록
 // onMarkerClick: 식당 마커를 클릭했을 때 호출 (식당 객체를 인자로 받음)
 export default function KakaoMap({ restaurants = [], onMarkerClick }) {
@@ -27,11 +42,10 @@ export default function KakaoMap({ restaurants = [], onMarkerClick }) {
         const officePosition = new kakao.maps.LatLng(OFFICE.lat, OFFICE.lng);
         const map = new kakao.maps.Map(mapContainerRef.current, {
           center: officePosition,
-          level: 4,
+          level: 5,
         });
 
         // 회사 위치는 일반 식당 마커보다 훨씬 크고 눈에 띄는 커스텀 핀으로 표시
-        // (이모지/특수문자 없이 순수 도형만 사용 - 일부 환경에서 텍스트 렌더링이 깨지는 것을 방지)
         const officeMarkerSvg = `
           <svg xmlns="http://www.w3.org/2000/svg" width="46" height="58" viewBox="0 0 46 58">
             <path d="M23 0C10.3 0 0 10.3 0 23c0 17.3 23 35 23 35s23-17.7 23-35C46 10.3 35.7 0 23 0z" fill="#1b2a34"/>
@@ -54,15 +68,23 @@ export default function KakaoMap({ restaurants = [], onMarkerClick }) {
         });
         officeInfo.open(map, officeMarker);
 
-        // 지도 범위를 자동으로 맞추기 위한 bounds
-        const bounds = new kakao.maps.LatLngBounds();
-        bounds.extend(officePosition);
+        // 거리 정규화를 위한 최댓값 (0으로 나누는 것 방지)
+        const maxDistance = Math.max(...restaurants.map((r) => r.distanceMeters || 0), 1);
+        const MIN_SIZE = 14; // 가장 먼 식당 마커 크기
+        const MAX_SIZE = 32; // 가장 가까운 식당 마커 크기
 
         restaurants.forEach((restaurant) => {
           const position = new kakao.maps.LatLng(restaurant.lat, restaurant.lng);
-          bounds.extend(position);
 
-          const marker = new kakao.maps.Marker({ position, map });
+          const ratio = Math.min((restaurant.distanceMeters || 0) / maxDistance, 1);
+          const sizePx = Math.round(MAX_SIZE - (MAX_SIZE - MIN_SIZE) * ratio);
+
+          const marker = new kakao.maps.Marker({
+            position,
+            map,
+            image: buildRestaurantMarkerImage(kakao, sizePx),
+            zIndex: Math.round(10 - ratio * 5), // 가까운 마커가 먼 마커 위에 그려지도록
+          });
 
           const infoWindow = new kakao.maps.InfoWindow({
             content: `<div style="padding:6px 10px;font-size:12px;">${restaurant.name}</div>`,
@@ -71,14 +93,19 @@ export default function KakaoMap({ restaurants = [], onMarkerClick }) {
           kakao.maps.event.addListener(marker, "mouseover", () => infoWindow.open(map, marker));
           kakao.maps.event.addListener(marker, "mouseout", () => infoWindow.close());
 
-          // 마커를 클릭하면 상세 정보로 이동할 수 있도록 콜백 연결
           if (onMarkerClick) {
             kakao.maps.event.addListener(marker, "click", () => onMarkerClick(restaurant));
           }
         });
 
-        if (restaurants.length > 0) {
-          map.setBounds(bounds, 40, 40, 40, 40);
+        // 식당이 1곳뿐인 경우(상세페이지)만 회사-식당 두 지점 기준으로 범위를 맞추고,
+        // 여러 곳일 때(홈 화면 전체 지도)는 좌표 이상치 하나 때문에 지도가 서울 전체로
+        // 확 줌아웃되는 것을 막기 위해 고정 줌 레벨(5)을 그대로 사용합니다.
+        if (restaurants.length === 1) {
+          const bounds = new kakao.maps.LatLngBounds();
+          bounds.extend(officePosition);
+          bounds.extend(new kakao.maps.LatLng(restaurants[0].lat, restaurants[0].lng));
+          map.setBounds(bounds, 60, 60, 60, 60);
         }
 
         setStatus("ready");
