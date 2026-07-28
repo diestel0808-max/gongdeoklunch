@@ -33,8 +33,7 @@ function loadKakaoMapScript(appKey) {
 
 // restaurants: 지도에 표시할 식당 목록
 // onMarkerClick: 식당 마커를 클릭했을 때 호출 (식당 객체를 인자로 받음)
-// showRoute: true면 회사 ↔ restaurants[0] 사이에 직선 경로선을 그림 (상세페이지에서 사용)
-export default function KakaoMap({ restaurants = [], onMarkerClick, showRoute = false }) {
+export default function KakaoMap({ restaurants = [], onMarkerClick }) {
   const mapContainerRef = useRef(null);
   const [status, setStatus] = useState("loading");
 
@@ -88,21 +87,7 @@ export default function KakaoMap({ restaurants = [], onMarkerClick, showRoute = 
           }
         });
 
-        // 회사 ↔ 첫 번째 식당 사이에 직선 경로선 표시 (상세페이지 전용)
-        // 실제 도로를 따라가는 길찾기는 별도의 카카오 모빌리티(길찾기) API가 필요해서,
-        // 지금은 방향과 직선거리를 보여주는 용도로 점선을 그립니다.
-        if (showRoute && restaurants.length > 0) {
-          const destination = new kakao.maps.LatLng(restaurants[0].lat, restaurants[0].lng);
-          const routeLine = new kakao.maps.Polyline({
-            path: [officePosition, destination],
-            strokeWeight: 4,
-            strokeColor: "#1bc5d8",
-            strokeOpacity: 0.9,
-            strokeStyle: "shortdash",
-          });
-          routeLine.setMap(map);
-          map.setBounds(bounds, 60, 60, 60, 60);
-        } else if (restaurants.length > 0) {
+        if (restaurants.length > 0) {
           map.setBounds(bounds);
         }
 
@@ -116,7 +101,7 @@ export default function KakaoMap({ restaurants = [], onMarkerClick, showRoute = 
       isMounted = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [restaurants, showRoute]);
+  }, [restaurants]);
 
   if (status === "error") {
     return (

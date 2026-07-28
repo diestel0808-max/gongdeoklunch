@@ -78,20 +78,10 @@ export default function RestaurantDetailPanel({ restaurant, onClose }) {
           </button>
         </div>
 
-        {/* 지도 - 회사에서 이 식당까지 가는 방향/직선거리 경로선 표시 */}
+        {/* 지도 */}
         <div style={{ height: "32vh", minHeight: 180 }}>
-          <KakaoMap restaurants={[restaurant]} showRoute />
+          <KakaoMap restaurants={[restaurant]} />
         </div>
-        <p
-          style={{
-            fontSize: 11,
-            color: "#999",
-            padding: "6px 20px 0",
-          }}
-        >
-          점선은 실제 도보 경로가 아닌 직선 방향 표시예요. 정확한 길찾기는 "카카오맵 원본"에서
-          확인해주세요.
-        </p>
 
         <div style={{ padding: 20 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
@@ -128,8 +118,8 @@ export default function RestaurantDetailPanel({ restaurant, onClose }) {
               🚶 대학내일 ES 사옥에서 도보 {restaurant.walkMinutes}분 ({restaurant.distanceMeters}m)
             </span>
             {restaurant.phone && <span>📞 {restaurant.phone}</span>}
-            <span>💰 가격대: {restaurant.priceRange}</span>
-            <span>👥 인원 수용: {restaurant.groupSize}</span>
+            <span>💰 가격대: {summary?.topPriceRange || restaurant.priceRange}</span>
+            <span>👥 함께 가기 좋은 인원: {summary?.topCompanion || restaurant.groupSize}</span>
           </div>
 
           {summary && (
@@ -215,9 +205,14 @@ export default function RestaurantDetailPanel({ restaurant, onClose }) {
                     <span style={{ color: "#999" }}>·</span>
                     <span style={{ color: "#666" }}>⏱ {joinValues(review.waiting)}</span>
                     <span style={{ color: "#666" }}>👥 {joinValues(review.companion)}</span>
-                    <span style={{ color: "#666" }}>💰 {review.priceFeel}</span>
+                    <span style={{ color: "#666" }}>💰 {review.priceRange} ({review.priceFeel})</span>
                     <span style={{ color: "#666" }}>🔁 {review.revisit}</span>
                   </div>
+                  {review.menu && (
+                    <p style={{ fontSize: 13, marginTop: 6, color: "#0a8fa0", fontWeight: 600 }}>
+                      🍽 {review.menu}
+                    </p>
+                  )}
                   {review.comment && (
                     <p style={{ fontSize: 13, marginTop: 6, color: "#333" }}>{review.comment}</p>
                   )}

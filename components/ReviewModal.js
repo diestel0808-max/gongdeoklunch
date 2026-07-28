@@ -4,6 +4,7 @@ import { useState } from "react";
 import {
   COMPANION_TAGS,
   PRICE_FEEL_OPTIONS,
+  PRICE_RANGE_OPTIONS,
   REVISIT_OPTIONS,
   WAITING_LEVELS,
 } from "@/lib/constants";
@@ -75,8 +76,10 @@ export default function ReviewModal({ restaurant, onClose, onSubmitted }) {
 
   const [waiting, setWaiting] = useState([]);
   const [companion, setCompanion] = useState([]);
+  const [priceRange, setPriceRange] = useState("");
   const [priceFeel, setPriceFeel] = useState("");
   const [revisit, setRevisit] = useState("");
+  const [menu, setMenu] = useState("");
   const [comment, setComment] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -109,8 +112,10 @@ export default function ReviewModal({ restaurant, onClose, onSubmitted }) {
       setErrorMessage("먼저 닉네임과 PIN을 설정해주세요.");
       return;
     }
-    if (waiting.length === 0 || companion.length === 0 || !priceFeel || !revisit) {
-      setErrorMessage("웨이팅 / 추천 동행 / 가격 체감 / 재방문 의사를 모두 선택해주세요.");
+    if (waiting.length === 0 || companion.length === 0 || !priceRange || !priceFeel || !revisit) {
+      setErrorMessage(
+        "웨이팅 / 추천 동행 / 가격대 / 가격 체감 / 재방문 의사를 모두 선택해주세요."
+      );
       return;
     }
 
@@ -118,8 +123,10 @@ export default function ReviewModal({ restaurant, onClose, onSubmitted }) {
       nickname: profile.nickname,
       waiting,
       companion,
+      priceRange,
       priceFeel,
       revisit,
+      menu: menu.trim(),
       comment: comment.trim(),
     });
 
@@ -263,6 +270,12 @@ export default function ReviewModal({ restaurant, onClose, onSubmitted }) {
           onToggle={(v) => toggleValue(companion, setCompanion, v)}
         />
         <SingleChipGroup
+          label="가격대 (1인 기준)"
+          options={PRICE_RANGE_OPTIONS}
+          value={priceRange}
+          onChange={setPriceRange}
+        />
+        <SingleChipGroup
           label="가격 체감"
           options={PRICE_FEEL_OPTIONS}
           value={priceFeel}
@@ -274,6 +287,24 @@ export default function ReviewModal({ restaurant, onClose, onSubmitted }) {
           value={revisit}
           onChange={setRevisit}
         />
+
+        <div style={{ marginBottom: 16 }}>
+          <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>
+            먹은 메뉴 <span style={{ fontWeight: 400, color: "#999" }}>(선택)</span>
+          </p>
+          <input
+            value={menu}
+            onChange={(e) => setMenu(e.target.value)}
+            placeholder="예: 제육볶음, 순두부찌개"
+            style={{
+              width: "100%",
+              padding: "8px 10px",
+              borderRadius: 8,
+              border: "1px solid var(--color-gray-300)",
+              fontSize: 13,
+            }}
+          />
+        </div>
 
         <div style={{ marginBottom: 16 }}>
           <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>한 줄 코멘트 (선택)</p>

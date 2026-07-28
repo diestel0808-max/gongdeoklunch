@@ -83,6 +83,7 @@ function RestaurantCard({ restaurant, onWriteReview, onOpenDetail }) {
           <>
             {summary.topWaiting && <span>⏱ {summary.topWaiting}</span>}
             {summary.topCompanion && <span>👥 {summary.topCompanion} 추천</span>}
+            {summary.topPriceRange && <span>💰 {summary.topPriceRange}</span>}
           </>
         ) : (
           <span style={{ color: "#bbb" }}>아직 등록된 후기가 없어요</span>
@@ -161,9 +162,14 @@ function RestaurantCard({ restaurant, onWriteReview, onOpenDetail }) {
                   <span style={{ color: "#999" }}>·</span>
                   <span style={{ color: "#666" }}>⏱ {joinValues(review.waiting)}</span>
                   <span style={{ color: "#666" }}>👥 {joinValues(review.companion)}</span>
-                  <span style={{ color: "#666" }}>💰 {review.priceFeel}</span>
+                  <span style={{ color: "#666" }}>💰 {review.priceRange} ({review.priceFeel})</span>
                   <span style={{ color: "#666" }}>🔁 {review.revisit}</span>
                 </div>
+                {review.menu && (
+                  <p style={{ fontSize: 12, marginTop: 4, color: "#0a8fa0", fontWeight: 600 }}>
+                    🍽 {review.menu}
+                  </p>
+                )}
                 {review.comment && (
                   <p style={{ fontSize: 12, marginTop: 4, color: "#333" }}>{review.comment}</p>
                 )}
