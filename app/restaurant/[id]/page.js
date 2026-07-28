@@ -20,8 +20,8 @@ export default function RestaurantDetailPage() {
   const [summary, setSummary] = useState(null);
   const [showReviewModal, setShowReviewModal] = useState(false);
 
-  const refreshReviews = () => {
-    const list = getReviewsForRestaurant(id);
+  const refreshReviews = async () => {
+    const list = await getReviewsForRestaurant(id);
     setReviews(list);
     setSummary(summarizeReviews(list));
   };

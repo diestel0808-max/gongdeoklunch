@@ -42,7 +42,7 @@ export default function AddRestaurantModal({ onClose, onAdded }) {
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!selectedPlace) {
       setErrorMessage("먼저 검색 결과에서 식당을 선택해주세요.");
       return;
@@ -52,17 +52,20 @@ export default function AddRestaurantModal({ onClose, onAdded }) {
       return;
     }
 
-    addCustomRestaurant({
-      placeName: selectedPlace.place_name,
-      address: selectedPlace.road_address_name || selectedPlace.address_name,
-      lat: Number(selectedPlace.y),
-      lng: Number(selectedPlace.x),
-      category,
-      kakaoMapUrl: selectedPlace.place_url,
-      phone: selectedPlace.phone,
-    });
-
-    onAdded();
+    try {
+      await addCustomRestaurant({
+        placeName: selectedPlace.place_name,
+        address: selectedPlace.road_address_name || selectedPlace.address_name,
+        lat: Number(selectedPlace.y),
+        lng: Number(selectedPlace.x),
+        category,
+        kakaoMapUrl: selectedPlace.place_url,
+        phone: selectedPlace.phone,
+      });
+      onAdded();
+    } catch (error) {
+      setErrorMessage(error.message);
+    }
   };
 
   return (

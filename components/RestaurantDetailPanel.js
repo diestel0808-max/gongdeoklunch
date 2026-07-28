@@ -10,7 +10,7 @@ import {
   summarizeReviews,
   toggleLikeReview,
 } from "@/lib/reviewStorage";
-import { getFavoriteCount, isFavorited, toggleFavorite } from "@/lib/favoriteStorage";
+import { getFavoriteInfoForRestaurant, toggleFavorite } from "@/lib/favoriteStorage";
 
 function joinValues(value) {
   return Array.isArray(value) ? value.join(", ") : value;
@@ -23,27 +23,30 @@ export default function RestaurantDetailPanel({ restaurant, onClose, inline = fa
   const [favoriteCount, setFavoriteCount] = useState(0);
   const [favorited, setFavorited] = useState(false);
 
-  const refreshReviews = () => {
-    const list = getReviewsForRestaurant(restaurant.id);
+  const refreshReviews = async () => {
+    const list = await getReviewsForRestaurant(restaurant.id);
     setReviews(list);
     setSummary(summarizeReviews(list));
   };
 
   useEffect(() => {
     refreshReviews();
-    setFavoriteCount(getFavoriteCount(restaurant.id));
-    setFavorited(isFavorited(restaurant.id));
+    getFavoriteInfoForRestaurant(restaurant.id).then(({ count, favorited }) => {
+      setFavoriteCount(count);
+      setFavorited(favorited);
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [restaurant.id]);
 
-  const handleToggleFavorite = () => {
-    const newCount = toggleFavorite(restaurant.id);
-    setFavoriteCount(newCount);
-    setFavorited(isFavorited(restaurant.id));
+  const handleToggleFavorite = async () => {
+    const nowFavorited = await toggleFavorite(restaurant.id);
+    const { count } = await getFavoriteInfoForRestaurant(restaurant.id);
+    setFavoriteCount(count);
+    setFavorited(nowFavorited);
   };
 
-  const handleLike = (reviewId) => {
-    toggleLikeReview(restaurant.id, reviewId);
+  const handleLike = async (review) => {
+    await toggleLikeReview(review);
     refreshReviews();
   };
 
@@ -275,7 +278,7 @@ export default function RestaurantDetailPanel({ restaurant, onClose, inline = fa
                     <p style={{ fontSize: 14, marginTop: 8, color: "#333", whiteSpace: "pre-line" }}>{review.comment}</p>
                   )}
                   <button
-                    onClick={() => handleLike(review.id)}
+                    onClick={() => handleLike(review)}
                     style={{
                       marginTop: 10,
                       display: "inline-flex",

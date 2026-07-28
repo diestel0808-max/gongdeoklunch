@@ -9,7 +9,7 @@ import {
   RECOMMENDED_FOR_OPTIONS,
   WAITING_LEVELS,
 } from "@/lib/constants";
-import { getRestaurantFilterData } from "@/lib/reviewStorage";
+import { getRestaurantFilterDataFrom } from "@/lib/reviewStorage";
 
 const chipStyle = (isActive) => ({
   padding: "6px 12px",
@@ -144,7 +144,7 @@ function interleaveByCategory(sortedList) {
   return result;
 }
 
-export default function LunchPickerModal({ restaurants, onClose, onOpenDetail }) {
+export default function LunchPickerModal({ restaurants, allReviews, onClose, onOpenDetail }) {
   const [step, setStep] = useState("form"); // form | thinking | result
   const [categories, setCategories] = useState([]);
   const [distances, setDistances] = useState([]);
@@ -183,7 +183,7 @@ export default function LunchPickerModal({ restaurants, onClose, onOpenDetail })
         (maxWalkMinutes === null || restaurant.walkMinutes <= maxWalkMinutes);
 
       const { waitingSet, headcountSet, recommendedForSet, priceRangeSet, reviewCount } =
-        getRestaurantFilterData(restaurant.id);
+        getRestaurantFilterDataFrom(allReviews, restaurant.id);
 
       let softMatched = 0;
       if (prices.length > 0 && prices.some((p) => priceRangeSet.has(p))) softMatched += 1;
@@ -223,7 +223,7 @@ export default function LunchPickerModal({ restaurants, onClose, onOpenDetail })
       totalConditions:
         totalSoftGroups + (categories.length > 0 ? 1 : 0) + (distances.length > 0 ? 1 : 0),
     };
-  }, [restaurants, categories, distances, prices, headcounts, recommendedFors, waitings]);
+  }, [restaurants, allReviews, categories, distances, prices, headcounts, recommendedFors, waitings]);
 
   const topPrimary = evaluated.primary.slice(0, 10);
 

@@ -12,13 +12,19 @@ import RestaurantDetailPanel from "@/components/RestaurantDetailPanel";
 import { CATEGORIES, DISTANCE_FILTER_OPTIONS, GROUP_SIZE_OPTIONS, OFFICE, PRICE_RANGE_OPTIONS, RECOMMENDED_FOR_OPTIONS, WAITING_LEVELS } from "@/lib/constants";
 import { getCustomRestaurants } from "@/lib/customRestaurantStorage";
 import {
-  getReviewsForRestaurant,
-  getRestaurantFilterData,
+  getAllReviews,
+  getReviewsForRestaurantFrom,
+  getRestaurantFilterDataFrom,
   hasLikedReview,
   summarizeReviews,
   toggleLikeReview,
 } from "@/lib/reviewStorage";
-import { getFavoriteCount, isFavorited, toggleFavorite } from "@/lib/favoriteStorage";
+import {
+  getAllFavorites,
+  getFavoriteCountFrom,
+  isFavoritedFrom,
+  toggleFavorite,
+} from "@/lib/favoriteStorage";
 import { cacheRestaurants } from "@/lib/restaurantCache";
 
 function joinValues(value) {
@@ -39,34 +45,31 @@ function filterSelectStyle(isActive) {
   };
 }
 
-function RestaurantCard({ restaurant, onWriteReview, onOpenDetail }) {
-  const [reviews, setReviews] = useState([]);
-  const [summary, setSummary] = useState(null);
-  const [favoriteCount, setFavoriteCount] = useState(0);
-  const [favorited, setFavorited] = useState(false);
+function RestaurantCard({
+  restaurant,
+  allReviews,
+  allFavorites,
+  onWriteReview,
+  onOpenDetail,
+  onRefreshReviews,
+  onRefreshFavorites,
+}) {
+  const reviews = useMemo(
+    () => getReviewsForRestaurantFrom(allReviews, restaurant.id),
+    [allReviews, restaurant.id]
+  );
+  const summary = useMemo(() => summarizeReviews(reviews), [reviews]);
+  const favoriteCount = getFavoriteCountFrom(allFavorites, restaurant.id);
+  const favorited = isFavoritedFrom(allFavorites, restaurant.id);
 
-  const refreshReviews = () => {
-    const list = getReviewsForRestaurant(restaurant.id);
-    setReviews(list);
-    setSummary(summarizeReviews(list));
+  const handleToggleFavorite = async () => {
+    await toggleFavorite(restaurant.id);
+    onRefreshFavorites();
   };
 
-  useEffect(() => {
-    refreshReviews();
-    setFavoriteCount(getFavoriteCount(restaurant.id));
-    setFavorited(isFavorited(restaurant.id));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [restaurant.id]);
-
-  const handleToggleFavorite = () => {
-    const newCount = toggleFavorite(restaurant.id);
-    setFavoriteCount(newCount);
-    setFavorited(isFavorited(restaurant.id));
-  };
-
-  const handleLike = (reviewId) => {
-    toggleLikeReview(restaurant.id, reviewId);
-    refreshReviews();
+  const handleLike = async (review) => {
+    await toggleLikeReview(review);
+    onRefreshReviews();
   };
 
   return (
@@ -194,7 +197,7 @@ function RestaurantCard({ restaurant, onWriteReview, onOpenDetail }) {
           상세보기
         </button>
         <button
-          onClick={() => onWriteReview(restaurant, refreshReviews)}
+          onClick={() => onWriteReview(restaurant)}
           style={{
             fontSize: 13,
             fontWeight: 600,
@@ -247,7 +250,7 @@ function RestaurantCard({ restaurant, onWriteReview, onOpenDetail }) {
                   <p style={{ fontSize: 13, marginTop: 4, color: "#333", whiteSpace: "pre-line" }}>{review.comment}</p>
                 )}
                 <button
-                  onClick={() => handleLike(review.id)}
+                  onClick={() => handleLike(review)}
                   style={{
                     marginTop: 6,
                     display: "inline-flex",
@@ -292,6 +295,21 @@ export default function HomePage() {
   const [showLunchPicker, setShowLunchPicker] = useState(false);
   const [showAddRestaurant, setShowAddRestaurant] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
+  const [allReviews, setAllReviews] = useState([]);
+  const [allFavorites, setAllFavorites] = useState([]);
+
+  const refreshAllReviews = useCallback(async () => {
+    setAllReviews(await getAllReviews());
+  }, []);
+
+  const refreshAllFavorites = useCallback(async () => {
+    setAllFavorites(await getAllFavorites());
+  }, []);
+
+  useEffect(() => {
+    refreshAllReviews();
+    refreshAllFavorites();
+  }, [refreshAllReviews, refreshAllFavorites]);
 
   useEffect(() => {
     const mql = window.matchMedia("(min-width: 768px)");
@@ -318,7 +336,7 @@ export default function HomePage() {
   }, [restaurants]);
 
   useEffect(() => {
-    setCustomRestaurants(getCustomRestaurants());
+    getCustomRestaurants().then(setCustomRestaurants);
   }, []);
 
   useEffect(() => {
@@ -374,7 +392,7 @@ export default function HomePage() {
     ) {
       list = list.filter((r) => {
         const { waitingSet, headcountSet, recommendedForSet, priceRangeSet } =
-          getRestaurantFilterData(r.id);
+          getRestaurantFilterDataFrom(allReviews, r.id);
         if (priceFilter !== "전체" && !priceRangeSet.has(priceFilter)) return false;
         if (headcountFilter !== "전체" && !headcountSet.has(headcountFilter)) return false;
         if (recommendedForFilter !== "전체" && !recommendedForSet.has(recommendedForFilter))
@@ -394,21 +412,25 @@ export default function HomePage() {
     headcountFilter,
     recommendedForFilter,
     waitingFilter,
+    allReviews,
   ]);
 
   const sortedRestaurants = useMemo(() => {
     if (sortOption === "favorite") {
       return [...filteredRestaurants].sort(
-        (a, b) => getFavoriteCount(b.id) - getFavoriteCount(a.id)
+        (a, b) =>
+          getFavoriteCountFrom(allFavorites, b.id) - getFavoriteCountFrom(allFavorites, a.id)
       );
     }
     if (sortOption === "review") {
       return [...filteredRestaurants].sort(
-        (a, b) => getRestaurantFilterData(b.id).reviewCount - getRestaurantFilterData(a.id).reviewCount
+        (a, b) =>
+          getRestaurantFilterDataFrom(allReviews, b.id).reviewCount -
+          getRestaurantFilterDataFrom(allReviews, a.id).reviewCount
       );
     }
     return filteredRestaurants; // 기본: 거리순 (restaurants가 이미 거리순으로 정렬돼있음)
-  }, [filteredRestaurants, sortOption]);
+  }, [filteredRestaurants, sortOption, allFavorites, allReviews]);
 
   return (
     <main style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
@@ -690,8 +712,12 @@ export default function HomePage() {
           <RestaurantCard
             key={restaurant.id}
             restaurant={restaurant}
-            onWriteReview={(target, onDone) => setReviewTarget({ restaurant: target, onDone })}
+            allReviews={allReviews}
+            allFavorites={allFavorites}
+            onWriteReview={(target) => setReviewTarget({ restaurant: target })}
             onOpenDetail={(target) => setDetailTarget(target)}
+            onRefreshReviews={refreshAllReviews}
+            onRefreshFavorites={refreshAllFavorites}
           />
         ))}
       </div>
@@ -705,7 +731,7 @@ export default function HomePage() {
           restaurant={reviewTarget.restaurant}
           onClose={() => setReviewTarget(null)}
           onSubmitted={() => {
-            reviewTarget.onDone();
+            refreshAllReviews();
             setReviewTarget(null);
           }}
         />
@@ -718,6 +744,7 @@ export default function HomePage() {
       {showLunchPicker && (
         <LunchPickerModal
           restaurants={restaurants}
+          allReviews={allReviews}
           onClose={() => setShowLunchPicker(false)}
           onOpenDetail={(restaurant) => {
             setShowLunchPicker(false);
@@ -730,7 +757,7 @@ export default function HomePage() {
         <AddRestaurantModal
           onClose={() => setShowAddRestaurant(false)}
           onAdded={() => {
-            setCustomRestaurants(getCustomRestaurants());
+            getCustomRestaurants().then(setCustomRestaurants);
             setShowAddRestaurant(false);
           }}
         />

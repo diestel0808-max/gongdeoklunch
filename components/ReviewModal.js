@@ -9,7 +9,7 @@ import {
   REVISIT_OPTIONS,
   WAITING_LEVELS,
 } from "@/lib/constants";
-import { addReview, clearProfile, getProfile, saveProfile } from "@/lib/reviewStorage";
+import { addReview, clearProfile, getProfile, saveProfile, verifyOrCreateProfile } from "@/lib/reviewStorage";
 
 const chipStyle = (isActive) => ({
   padding: "6px 12px",
@@ -84,21 +84,36 @@ export default function ReviewModal({ restaurant, onClose, onSubmitted }) {
   const [menu, setMenu] = useState("");
   const [comment, setComment] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const toggleValue = (list, setList, value) => {
     setList(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
   };
 
-  const handleConfirmProfile = () => {
+  const handleConfirmProfile = async () => {
     if (!nicknameInput.trim() || pinInput.trim().length !== 6) {
       setErrorMessage("닉네임과 6자리 PIN을 입력해주세요.");
       return;
     }
-    const newProfile = { nickname: nicknameInput.trim(), pin: pinInput.trim() };
+    setIsVerifying(true);
+    setErrorMessage("");
+
+    const nickname = nicknameInput.trim();
+    const pin = pinInput.trim();
+    const result = await verifyOrCreateProfile(nickname, pin);
+
+    setIsVerifying(false);
+
+    if (!result.ok) {
+      setErrorMessage(result.message);
+      return;
+    }
+
+    const newProfile = { nickname, pin };
     saveProfile(newProfile);
     setProfile(newProfile);
     setIsEditingProfile(false);
-    setErrorMessage("");
   };
 
   const handleSwitchProfile = () => {
@@ -109,7 +124,7 @@ export default function ReviewModal({ restaurant, onClose, onSubmitted }) {
     setIsEditingProfile(true);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!profile) {
       setErrorMessage("먼저 닉네임과 PIN을 설정해주세요.");
       return;
@@ -128,19 +143,27 @@ export default function ReviewModal({ restaurant, onClose, onSubmitted }) {
       return;
     }
 
-    addReview(restaurant.id, {
-      nickname: profile.nickname,
-      waiting,
-      headcount,
-      recommendedFor,
-      priceRange,
-      priceFeel,
-      revisit,
-      menu: menu.trim(),
-      comment: comment.trim(),
-    });
+    setIsSubmitting(true);
+    setErrorMessage("");
 
-    onSubmitted();
+    try {
+      await addReview(restaurant.id, {
+        nickname: profile.nickname,
+        waiting,
+        headcount,
+        recommendedFor,
+        priceRange,
+        priceFeel,
+        revisit,
+        menu: menu.trim(),
+        comment: comment.trim(),
+      });
+      onSubmitted();
+    } catch (error) {
+      setErrorMessage(error.message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -246,6 +269,7 @@ export default function ReviewModal({ restaurant, onClose, onSubmitted }) {
               />
               <button
                 onClick={handleConfirmProfile}
+                disabled={isVerifying}
                 style={{
                   padding: "0 14px",
                   borderRadius: 8,
@@ -254,10 +278,11 @@ export default function ReviewModal({ restaurant, onClose, onSubmitted }) {
                   color: "#fff",
                   fontSize: 13,
                   fontWeight: 600,
-                  cursor: "pointer",
+                  cursor: isVerifying ? "default" : "pointer",
+                  opacity: isVerifying ? 0.6 : 1,
                 }}
               >
-                확인
+                {isVerifying ? "확인 중..." : "확인"}
               </button>
             </div>
             <p style={{ fontSize: 11, color: "#999", marginTop: 6 }}>
@@ -349,6 +374,7 @@ export default function ReviewModal({ restaurant, onClose, onSubmitted }) {
 
         <button
           onClick={handleSubmit}
+          disabled={isSubmitting}
           style={{
             width: "100%",
             padding: "12px 0",
@@ -358,10 +384,11 @@ export default function ReviewModal({ restaurant, onClose, onSubmitted }) {
             color: "#fff",
             fontWeight: 700,
             fontSize: 14,
-            cursor: "pointer",
+            cursor: isSubmitting ? "default" : "pointer",
+            opacity: isSubmitting ? 0.6 : 1,
           }}
         >
-          후기 등록하기
+          {isSubmitting ? "등록 중..." : "후기 등록하기"}
         </button>
       </div>
     </div>
