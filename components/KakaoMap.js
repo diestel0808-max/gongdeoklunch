@@ -31,14 +31,15 @@ export default function KakaoMap({ restaurants = [], onMarkerClick }) {
         });
 
         // 회사 위치는 일반 식당 마커보다 훨씬 크고 눈에 띄는 커스텀 핀으로 표시
+        // (이모지/특수문자 없이 순수 도형만 사용 - 일부 환경에서 텍스트 렌더링이 깨지는 것을 방지)
         const officeMarkerSvg = `
           <svg xmlns="http://www.w3.org/2000/svg" width="46" height="58" viewBox="0 0 46 58">
             <path d="M23 0C10.3 0 0 10.3 0 23c0 17.3 23 35 23 35s23-17.7 23-35C46 10.3 35.7 0 23 0z" fill="#1b2a34"/>
             <circle cx="23" cy="23" r="15" fill="#1bc5d8"/>
-            <text x="23" y="29" font-size="16" text-anchor="middle" fill="#ffffff">🏢</text>
+            <circle cx="23" cy="23" r="6" fill="#ffffff"/>
           </svg>`;
         const officeMarkerImage = new kakao.maps.MarkerImage(
-          `data:image/svg+xml;base64,${btoa(officeMarkerSvg)}`,
+          `data:image/svg+xml;charset=utf-8,${encodeURIComponent(officeMarkerSvg)}`,
           new kakao.maps.Size(46, 58),
           { offset: new kakao.maps.Point(23, 58) }
         );
@@ -82,7 +83,8 @@ export default function KakaoMap({ restaurants = [], onMarkerClick }) {
 
         setStatus("ready");
       })
-      .catch(() => {
+      .catch((error) => {
+        console.error("카카오맵 로드/렌더링 오류:", error);
         if (isMounted) setStatus("error");
       });
 

@@ -253,10 +253,13 @@ export default function HomePage() {
   const [showAddRestaurant, setShowAddRestaurant] = useState(false);
 
   const restaurants = useMemo(() => {
+    // 카카오 API 로딩이 끝나기 전에 사용자 등록 식당만 먼저 뜨면 어색해 보이므로,
+    // 로딩이 완전히 끝난 뒤에만 두 목록을 합칩니다.
+    if (status !== "ready") return [];
     return [...apiRestaurants, ...customRestaurants].sort(
       (a, b) => a.distanceMeters - b.distanceMeters
     );
-  }, [apiRestaurants, customRestaurants]);
+  }, [apiRestaurants, customRestaurants, status]);
 
   useEffect(() => {
     cacheRestaurants(restaurants);
