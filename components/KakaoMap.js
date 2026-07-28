@@ -52,6 +52,7 @@ export default function KakaoMap({ restaurants = [], onMarkerClick, highlightedI
   const mapInstanceRef = useRef(null);
   const clustererRef = useRef(null);
   const markersRef = useRef([]);
+  const infoWindowsRef = useRef([]);
   const [status, setStatus] = useState("loading");
   const [isMapReady, setIsMapReady] = useState(false);
 
@@ -133,6 +134,10 @@ export default function KakaoMap({ restaurants = [], onMarkerClick, highlightedI
     }
     markersRef.current.forEach((marker) => marker.setMap(null));
     markersRef.current = [];
+    // 이전에 열려있던 말풍선(정보창)들을 확실히 닫아서, 마커를 다시 그릴 때
+    // 예전 말풍선이 화면에 계속 남아있는 문제를 방지합니다.
+    infoWindowsRef.current.forEach((iw) => iw.close());
+    infoWindowsRef.current = [];
 
     const maxDistance = Math.max(...restaurants.map((r) => r.distanceMeters || 0), 1);
     const MIN_SIZE = 10;
@@ -159,12 +164,16 @@ export default function KakaoMap({ restaurants = [], onMarkerClick, highlightedI
       const infoWindow = new kakao.maps.InfoWindow({
         content: `<div style="padding:6px 10px;font-size:12px;">${restaurant.name}</div>`,
       });
+      infoWindowsRef.current.push(infoWindow);
 
       kakao.maps.event.addListener(marker, "mouseover", () => infoWindow.open(map, marker));
       kakao.maps.event.addListener(marker, "mouseout", () => infoWindow.close());
 
       if (onMarkerClick) {
-        kakao.maps.event.addListener(marker, "click", () => onMarkerClick(restaurant));
+        kakao.maps.event.addListener(marker, "click", () => {
+          infoWindow.close();
+          onMarkerClick(restaurant);
+        });
       }
 
       allMarkers.push(marker);

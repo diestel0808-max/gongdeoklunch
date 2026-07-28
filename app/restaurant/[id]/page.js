@@ -198,7 +198,7 @@ export default function RestaurantDetailPage() {
                 </p>
               )}
               {review.comment && (
-                <p style={{ fontSize: 13, marginTop: 6, color: "#333" }}>{review.comment}</p>
+                <p style={{ fontSize: 13, marginTop: 6, color: "#333", whiteSpace: "pre-line" }}>{review.comment}</p>
               )}
             </div>
           ))}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import AddRestaurantModal from "@/components/AddRestaurantModal";
 import HeartIcon from "@/components/HeartIcon";
 import NoticeBanner from "@/components/NoticeBanner";
@@ -240,7 +240,7 @@ function RestaurantCard({ restaurant, onWriteReview, onOpenDetail }) {
                   </p>
                 )}
                 {review.comment && (
-                  <p style={{ fontSize: 12, marginTop: 4, color: "#333" }}>{review.comment}</p>
+                  <p style={{ fontSize: 12, marginTop: 4, color: "#333", whiteSpace: "pre-line" }}>{review.comment}</p>
                 )}
                 <button
                   onClick={() => handleLike(review.id)}
@@ -296,6 +296,9 @@ export default function HomePage() {
     mql.addEventListener("change", handler);
     return () => mql.removeEventListener("change", handler);
   }, []);
+
+  // onMarkerClick을 매 렌더마다 새로 만들면 지도 마커가 불필요하게 자주 다시 그려지므로 고정
+  const handleMarkerClick = useCallback((restaurant) => setDetailTarget(restaurant), []);
 
   const restaurants = useMemo(() => {
     // 카카오 API 로딩이 끝나기 전에 사용자 등록 식당만 먼저 뜨면 어색해 보이므로,
@@ -470,7 +473,7 @@ export default function HomePage() {
           <KakaoMap
             restaurants={sortedRestaurants}
             highlightedId={detailTarget?.id}
-            onMarkerClick={(restaurant) => setDetailTarget(restaurant)}
+            onMarkerClick={handleMarkerClick}
           />
         </div>
 

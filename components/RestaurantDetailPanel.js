@@ -272,7 +272,7 @@ export default function RestaurantDetailPanel({ restaurant, onClose, inline = fa
                     </p>
                   )}
                   {review.comment && (
-                    <p style={{ fontSize: 14, marginTop: 8, color: "#333" }}>{review.comment}</p>
+                    <p style={{ fontSize: 14, marginTop: 8, color: "#333", whiteSpace: "pre-line" }}>{review.comment}</p>
                   )}
                   <button
                     onClick={() => handleLike(review.id)}
