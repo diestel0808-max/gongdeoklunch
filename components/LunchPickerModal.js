@@ -102,6 +102,9 @@ function RestaurantResultCard({ result, totalConditions, onOpenDetail }) {
 // 슬롯머신처럼 점점 느려지며 멈추는 딜레이 간격(ms)
 const ROLL_DELAYS = [70, 70, 80, 90, 100, 120, 150, 190, 240, 300, 380];
 
+// 룰렛이 도는 동안 보여줄 음식 이모지 (실제 후보 이름은 숨기고 긴장감만 연출)
+const ROLL_EMOJIS = ["🍜", "🍣", "🍕", "🍔", "🥗", "🍱", "🍲", "🥘", "🌮", "🍛"];
+
 export default function LunchPickerModal({ restaurants, onClose, onOpenDetail }) {
   const [step, setStep] = useState("form"); // form | result
   const [categories, setCategories] = useState([]);
@@ -111,7 +114,7 @@ export default function LunchPickerModal({ restaurants, onClose, onOpenDetail })
   const [waitings, setWaitings] = useState([]);
 
   const [pickerState, setPickerState] = useState("idle"); // idle | rolling | picked
-  const [rollingName, setRollingName] = useState("");
+  const [rollingEmoji, setRollingEmoji] = useState("🍜");
   const [pickedResult, setPickedResult] = useState(null);
   const lastPickedIdRef = useRef(null);
   const rollTimeoutRef = useRef(null);
@@ -167,8 +170,12 @@ export default function LunchPickerModal({ restaurants, onClose, onOpenDetail })
     if (rankedResults.scored.length === 0) return;
 
     const topScore = rankedResults.scored[0].matchedCount;
-    let pool = rankedResults.scored.filter((r) => r.matchedCount === topScore).slice(0, 8);
-    if (pool.length === 0) pool = rankedResults.scored.slice(0, 8);
+    // 조건을 하나도 안 골랐으면 topScore가 모두 0이라 사실상 전체 식당이 풀이 됨.
+    // (이전엔 여기서 상위 8개로 잘라서, 후기순 정렬 특성상 후기 있는 곳 위주로만
+    // 돌아가는 것처럼 보이는 문제가 있었음 - 이제 매칭 조건을 만족하는 곳 전체를
+    // 공정하게 풀에 넣음)
+    let pool = rankedResults.scored.filter((r) => r.matchedCount === topScore);
+    if (pool.length === 0) pool = rankedResults.scored;
 
     let candidatePool =
       pool.length > 1 ? pool.filter((r) => r.restaurant.id !== lastPickedIdRef.current) : pool;
@@ -181,8 +188,9 @@ export default function LunchPickerModal({ restaurants, onClose, onOpenDetail })
     setPickedResult(null);
 
     const runStep = (idx) => {
-      const randomDuring = pool[Math.floor(Math.random() * pool.length)];
-      setRollingName(randomDuring.restaurant.name);
+      // 룰렛이 도는 동안엔 실제 식당 이름 대신 음식 이모지만 랜덤하게 보여줘서
+      // 어떤 후보들이 있는지 미리 다 드러나지 않게 함 (긴장감/서프라이즈 유지)
+      setRollingEmoji(ROLL_EMOJIS[Math.floor(Math.random() * ROLL_EMOJIS.length)]);
 
       if (idx >= ROLL_DELAYS.length) {
         lastPickedIdRef.current = finalPick.restaurant.id;
@@ -287,13 +295,13 @@ export default function LunchPickerModal({ restaurants, onClose, onOpenDetail })
                   </p>
                   <p
                     style={{
-                      fontSize: 22,
+                      fontSize: 48,
                       fontWeight: 800,
                       color: "var(--color-navy)",
                       animation: "lunchpicker-pulse 0.3s ease-in-out infinite",
                     }}
                   >
-                    🎲 {rollingName}
+                    {rollingEmoji}
                   </p>
                 </>
               )}
