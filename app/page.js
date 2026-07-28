@@ -2,13 +2,169 @@
 
 import { useEffect, useMemo, useState } from "react";
 import KakaoMap from "@/components/KakaoMap";
+import ReviewModal from "@/components/ReviewModal";
 import { CATEGORIES, OFFICE } from "@/lib/constants";
+import { getReviewsForRestaurant, summarizeReviews } from "@/lib/reviewStorage";
+
+function RestaurantCard({ restaurant, onWriteReview }) {
+  const [showReviews, setShowReviews] = useState(false);
+  const [reviews, setReviews] = useState([]);
+  const [summary, setSummary] = useState(null);
+
+  // 후기 개수는 카드가 처음 보일 때 한 번 불러와서 요약 표시
+  useEffect(() => {
+    const list = getReviewsForRestaurant(restaurant.id);
+    setReviews(list);
+    setSummary(summarizeReviews(list));
+  }, [restaurant.id]);
+
+  const refreshReviews = () => {
+    const list = getReviewsForRestaurant(restaurant.id);
+    setReviews(list);
+    setSummary(summarizeReviews(list));
+  };
+
+  return (
+    <div
+      style={{
+        border: "1px solid var(--color-gray-300)",
+        borderRadius: 12,
+        padding: 14,
+        marginBottom: 10,
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div>
+          <h2 style={{ fontSize: 15, fontWeight: 700 }}>{restaurant.name}</h2>
+          <p style={{ fontSize: 12, color: "#7a8288", marginTop: 2 }}>{restaurant.address}</p>
+        </div>
+        <span
+          style={{
+            fontSize: 11,
+            fontWeight: 700,
+            color: "var(--color-teal)",
+            background: "var(--color-teal-light)",
+            padding: "3px 8px",
+            borderRadius: 6,
+            flexShrink: 0,
+          }}
+        >
+          {restaurant.category}
+        </span>
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          gap: 10,
+          marginTop: 10,
+          fontSize: 12,
+          color: "#555",
+          flexWrap: "wrap",
+        }}
+      >
+        <span>
+          🚶 도보 {restaurant.walkMinutes}분 ({restaurant.distanceMeters}m)
+        </span>
+        {summary ? (
+          <>
+            {summary.topWaiting && <span>⏱ {summary.topWaiting}</span>}
+            {summary.topCompanion && <span>👥 {summary.topCompanion} 추천</span>}
+          </>
+        ) : (
+          <span style={{ color: "#bbb" }}>아직 등록된 후기가 없어요</span>
+        )}
+      </div>
+
+      <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+        <a
+          href={restaurant.kakaoMapUrl}
+          target="_blank"
+          rel="noreferrer"
+          style={{
+            fontSize: 12,
+            fontWeight: 600,
+            color: "var(--color-navy)",
+            border: "1px solid var(--color-gray-300)",
+            borderRadius: 6,
+            padding: "6px 10px",
+          }}
+        >
+          카카오맵에서 보기
+        </a>
+        <button
+          onClick={() => onWriteReview(restaurant, refreshReviews)}
+          style={{
+            fontSize: 12,
+            fontWeight: 600,
+            color: "#fff",
+            background: "var(--color-navy)",
+            border: "none",
+            borderRadius: 6,
+            padding: "6px 10px",
+            cursor: "pointer",
+          }}
+        >
+          후기 남기기
+        </button>
+        {reviews.length > 0 && (
+          <button
+            onClick={() => setShowReviews((v) => !v)}
+            style={{
+              fontSize: 12,
+              fontWeight: 600,
+              color: "var(--color-navy)",
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+            }}
+          >
+            후기 {reviews.length}개 {showReviews ? "접기 ▲" : "보기 ▼"}
+          </button>
+        )}
+        <button
+          style={{
+            fontSize: 12,
+            color: "#aaa",
+            background: "transparent",
+            border: "none",
+            cursor: "pointer",
+            marginLeft: "auto",
+          }}
+        >
+          신고
+        </button>
+      </div>
+
+      {showReviews && (
+        <div style={{ marginTop: 12, borderTop: "1px solid var(--color-gray-300)", paddingTop: 10 }}>
+          {reviews.map((review) => (
+            <div key={review.id} style={{ marginBottom: 10 }}>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", fontSize: 11 }}>
+                <span style={{ fontWeight: 700 }}>{review.nickname}</span>
+                <span style={{ color: "#999" }}>·</span>
+                <span style={{ color: "#666" }}>⏱ {review.waiting}</span>
+                <span style={{ color: "#666" }}>👥 {review.companion}</span>
+                <span style={{ color: "#666" }}>💰 {review.priceFeel}</span>
+                <span style={{ color: "#666" }}>🔁 {review.revisit}</span>
+              </div>
+              {review.comment && (
+                <p style={{ fontSize: 12, marginTop: 4, color: "#333" }}>{review.comment}</p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function HomePage() {
   const [activeCategory, setActiveCategory] = useState("전체");
   const [restaurants, setRestaurants] = useState([]);
   const [status, setStatus] = useState("loading"); // loading | ready | error
   const [errorMessage, setErrorMessage] = useState("");
+  const [reviewTarget, setReviewTarget] = useState(null); // { restaurant, onDone }
 
   useEffect(() => {
     let isMounted = true;
@@ -41,14 +197,7 @@ export default function HomePage() {
   }, [restaurants, activeCategory]);
 
   return (
-    <main
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        height: "100vh",
-      }}
-    >
-      {/* 헤더 */}
+    <main style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
       <header
         style={{
           padding: "14px 16px",
@@ -78,12 +227,10 @@ export default function HomePage() {
         </button>
       </header>
 
-      {/* 지도 영역 */}
       <div style={{ height: "45vh", minHeight: 240 }}>
         <KakaoMap restaurants={filteredRestaurants} />
       </div>
 
-      {/* 카테고리 필터 탭 */}
       <div
         style={{
           display: "flex",
@@ -117,30 +264,14 @@ export default function HomePage() {
         })}
       </div>
 
-      {/* 상세 필터 자리 (다음 단계에서 실제 동작 연결 예정) */}
-      <div
-        style={{
-          display: "flex",
-          gap: 8,
-          padding: "8px 16px",
-          fontSize: 12,
-          color: "#7a8288",
-        }}
-      >
+      <div style={{ display: "flex", gap: 8, padding: "8px 16px", fontSize: 12, color: "#7a8288" }}>
         <span>거리 ▾</span>
         <span>가격 ▾</span>
         <span>인원 ▾</span>
         <span>웨이팅 ▾</span>
       </div>
 
-      {/* 리스트 영역 */}
-      <div
-        style={{
-          flex: 1,
-          overflowY: "auto",
-          padding: "8px 16px 24px",
-        }}
-      >
+      <div style={{ flex: 1, overflowY: "auto", padding: "8px 16px 24px" }}>
         {status === "loading" && (
           <p style={{ fontSize: 13, color: "#999", padding: "24px 0" }}>
             공덕역 인근 식당 정보를 불러오는 중...
@@ -160,104 +291,24 @@ export default function HomePage() {
         )}
 
         {filteredRestaurants.map((restaurant) => (
-          <div
+          <RestaurantCard
             key={restaurant.id}
-            style={{
-              border: "1px solid var(--color-gray-300)",
-              borderRadius: 12,
-              padding: 14,
-              marginBottom: 10,
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "flex-start",
-              }}
-            >
-              <div>
-                <h2 style={{ fontSize: 15, fontWeight: 700 }}>{restaurant.name}</h2>
-                <p style={{ fontSize: 12, color: "#7a8288", marginTop: 2 }}>
-                  {restaurant.address}
-                </p>
-              </div>
-              <span
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color: "var(--color-teal)",
-                  background: "var(--color-teal-light)",
-                  padding: "3px 8px",
-                  borderRadius: 6,
-                  flexShrink: 0,
-                }}
-              >
-                {restaurant.category}
-              </span>
-            </div>
-
-            <div
-              style={{
-                display: "flex",
-                gap: 10,
-                marginTop: 10,
-                fontSize: 12,
-                color: "#555",
-                flexWrap: "wrap",
-              }}
-            >
-              <span>🚶 도보 {restaurant.walkMinutes}분 ({restaurant.distanceMeters}m)</span>
-              <span>💰 {restaurant.priceRange}</span>
-              <span>⏱ 웨이팅 {restaurant.waiting}</span>
-            </div>
-
-            <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-              <a
-                href={restaurant.kakaoMapUrl}
-                target="_blank"
-                rel="noreferrer"
-                style={{
-                  fontSize: 12,
-                  fontWeight: 600,
-                  color: "var(--color-navy)",
-                  border: "1px solid var(--color-gray-300)",
-                  borderRadius: 6,
-                  padding: "6px 10px",
-                }}
-              >
-                카카오맵에서 보기
-              </a>
-              <button
-                style={{
-                  fontSize: 12,
-                  fontWeight: 600,
-                  color: "#fff",
-                  background: "var(--color-navy)",
-                  border: "none",
-                  borderRadius: 6,
-                  padding: "6px 10px",
-                  cursor: "pointer",
-                }}
-              >
-                후기 남기기
-              </button>
-              <button
-                style={{
-                  fontSize: 12,
-                  color: "#aaa",
-                  background: "transparent",
-                  border: "none",
-                  cursor: "pointer",
-                  marginLeft: "auto",
-                }}
-              >
-                신고
-              </button>
-            </div>
-          </div>
+            restaurant={restaurant}
+            onWriteReview={(target, onDone) => setReviewTarget({ restaurant: target, onDone })}
+          />
         ))}
       </div>
+
+      {reviewTarget && (
+        <ReviewModal
+          restaurant={reviewTarget.restaurant}
+          onClose={() => setReviewTarget(null)}
+          onSubmitted={() => {
+            reviewTarget.onDone();
+            setReviewTarget(null);
+          }}
+        />
+      )}
     </main>
   );
 }
