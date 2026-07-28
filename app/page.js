@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import AddRestaurantModal from "@/components/AddRestaurantModal";
 import KakaoMap from "@/components/KakaoMap";
 import LunchPickerModal from "@/components/LunchPickerModal";
 import ReviewModal from "@/components/ReviewModal";
 import RestaurantDetailPanel from "@/components/RestaurantDetailPanel";
 import { CATEGORIES, COMPANION_TAGS, DISTANCE_FILTER_OPTIONS, OFFICE, PRICE_RANGE_OPTIONS, WAITING_LEVELS } from "@/lib/constants";
+import { getCustomRestaurants } from "@/lib/customRestaurantStorage";
 import {
   getReviewsForRestaurant,
   getRestaurantFilterData,
@@ -81,6 +83,23 @@ function RestaurantCard({ restaurant, onWriteReview, onOpenDetail }) {
           {restaurant.category}
         </span>
       </div>
+
+      {restaurant.source === "user" && (
+        <span
+          style={{
+            display: "inline-block",
+            fontSize: 10,
+            fontWeight: 700,
+            color: "#888",
+            border: "1px solid var(--color-gray-300)",
+            padding: "1px 6px",
+            borderRadius: 4,
+            marginTop: 6,
+          }}
+        >
+          사용자 등록
+        </span>
+      )}
 
       <div
         style={{
@@ -224,12 +243,28 @@ export default function HomePage() {
   const [priceFilter, setPriceFilter] = useState("전체");
   const [companionFilter, setCompanionFilter] = useState("전체");
   const [waitingFilter, setWaitingFilter] = useState("전체");
-  const [restaurants, setRestaurants] = useState([]);
+  const [apiRestaurants, setApiRestaurants] = useState([]);
+  const [customRestaurants, setCustomRestaurants] = useState([]);
   const [status, setStatus] = useState("loading"); // loading | ready | error
   const [errorMessage, setErrorMessage] = useState("");
   const [reviewTarget, setReviewTarget] = useState(null);
   const [detailTarget, setDetailTarget] = useState(null);
   const [showLunchPicker, setShowLunchPicker] = useState(false);
+  const [showAddRestaurant, setShowAddRestaurant] = useState(false);
+
+  const restaurants = useMemo(() => {
+    return [...apiRestaurants, ...customRestaurants].sort(
+      (a, b) => a.distanceMeters - b.distanceMeters
+    );
+  }, [apiRestaurants, customRestaurants]);
+
+  useEffect(() => {
+    cacheRestaurants(restaurants);
+  }, [restaurants]);
+
+  useEffect(() => {
+    setCustomRestaurants(getCustomRestaurants());
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -243,8 +278,7 @@ export default function HomePage() {
       .then((data) => {
         if (!isMounted) return;
         const list = data.restaurants || [];
-        setRestaurants(list);
-        cacheRestaurants(list);
+        setApiRestaurants(list);
         setStatus("ready");
       })
       .catch((err) => {
@@ -302,7 +336,7 @@ export default function HomePage() {
         }}
       >
         <div>
-          <h1 style={{ fontSize: 16, fontWeight: 700 }}>공덕 점심 뭐먹지?</h1>
+          <h1 style={{ fontSize: 16, fontWeight: 700 }}>댕턴뭐먹지</h1>
           <p style={{ fontSize: 12, color: "#7a8288" }}>{OFFICE.name} 기준</p>
         </div>
         <div style={{ display: "flex", gap: 6 }}>
@@ -323,6 +357,7 @@ export default function HomePage() {
             🍽 오늘 점심 뭐 먹지?
           </button>
           <button
+            onClick={() => setShowAddRestaurant(true)}
             style={{
               fontSize: 12,
               padding: "8px 12px",
@@ -534,6 +569,16 @@ export default function HomePage() {
           onOpenDetail={(restaurant) => {
             setShowLunchPicker(false);
             setDetailTarget(restaurant);
+          }}
+        />
+      )}
+
+      {showAddRestaurant && (
+        <AddRestaurantModal
+          onClose={() => setShowAddRestaurant(false)}
+          onAdded={() => {
+            setCustomRestaurants(getCustomRestaurants());
+            setShowAddRestaurant(false);
           }}
         />
       )}

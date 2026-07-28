@@ -8,6 +8,10 @@ import {
 } from "@/lib/constants";
 import { getDistanceMeters, estimateWalkMinutes } from "@/lib/distance";
 
+// Vercel 서버리스 함수 기본 제한(10초)보다 여유를 주기 위해 최대 실행시간을 늘림
+// (요금제에 따라 무시될 수 있지만, 지원되는 환경에서는 타임아웃을 방지해줌)
+export const maxDuration = 30;
+
 // 카카오가 준 상세 분류 문자열(예: "음식점 > 한식 > 국밥")을 보고
 // 우리 서비스 카테고리로 재분류
 function classifyCategory(categoryName, placeName) {
@@ -56,56 +60,54 @@ async function searchKakaoCategory({ groupCode, apiKey, page, centerLat, centerL
   return response.json();
 }
 
-// 한 중심점에서 최대 3페이지(45개, 카카오 API 상한)까지 가져오기
-// 이 지점 하나가 실패해도(네트워크 오류 등) 전체 응답이 죽지 않도록,
-// 실패 시 빈 배열을 반환하고 넘어갑니다.
+// 한 중심점에서 최대 3페이지(45개, 카카오 API 상한)까지 가져오기.
+// 실패해도(순간적인 요청제한 등) 전체가 죽지 않도록 빈 배열을 반환하고 넘어감.
+// 한 번 실패하면 잠깐 쉬었다가 1회 재시도해서, 일시적인 요청제한이었을 경우 복구를 시도함.
 async function fetchAllPagesForPoint({ groupCode, apiKey, centerLat, centerLng, radius }) {
   const allDocuments = [];
 
-  try {
-    for (let page = 1; page <= 3; page += 1) {
-      const data = await searchKakaoCategory({
-        groupCode,
-        apiKey,
-        page,
-        centerLat,
-        centerLng,
-        radius,
-      });
-      allDocuments.push(...(data.documents || []));
-      if (data.meta?.is_end) break;
+  const fetchPageWithRetry = async (page) => {
+    try {
+      return await searchKakaoCategory({ groupCode, apiKey, page, centerLat, centerLng, radius });
+    } catch (error) {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      try {
+        return await searchKakaoCategory({ groupCode, apiKey, page, centerLat, centerLng, radius });
+      } catch (retryError) {
+        console.error("격자 지점 검색 실패(건너뜀):", retryError.message);
+        return null;
+      }
     }
-  } catch (error) {
-    console.error("격자 지점 검색 실패(건너뜀):", error.message);
-    return [];
+  };
+
+  for (let page = 1; page <= 3; page += 1) {
+    const data = await fetchPageWithRetry(page);
+    if (!data) break;
+    allDocuments.push(...(data.documents || []));
+    if (data.meta?.is_end) break;
   }
 
   return allDocuments;
 }
 
-// ---------------------------------------------------------------
-// 카카오 로컬 API는 한 번의 검색(중심점+반경)당 최대 45개까지만 돌려줍니다.
-// 반경 안에 식당이 45개보다 많으면 뒤에 있는 곳들이 통째로 누락돼요.
-// 그래서 큰 반경 하나로 검색하는 대신, 반경을 3x3 격자(9개 지점)로
-// 잘게 나눠서 각각 검색한 뒤 결과를 합치는 방식으로 보완합니다.
-// ---------------------------------------------------------------
-// ---------------------------------------------------------------
-// 카카오 로컬 API는 한 번의 검색(중심점+반경)당 최대 45개까지만 돌려줍니다.
-// 반경 안에 식당이 45개보다 많으면 뒤에 있는 곳들이 통째로 누락돼요.
-// 그래서 큰 반경 하나로 검색하는 대신, 반경을 3x3 격자(9개 지점)로
-// 잘게 나눠서 각각 검색한 뒤 결과를 합치는 방식으로 보완합니다.
-//
-// [주의] 격자 간격과 각 지점의 검색 반경은 "1km 원 전체가 어느 지점에서든
-// 최소 한 곳의 검색 반경에는 들어오도록" 서로 맞물려야 합니다.
-// 간격 500m로 배치하면, 정동/정서/정남/정북 방향 끝(1000m 지점)이
-// 가장 가까운 격자 지점(500m 지점)에서 500m 떨어져 있으므로
-// 각 지점의 검색 반경을 500m보다 여유 있게(600m) 잡아 사각지대를 없앱니다.
-// ---------------------------------------------------------------
+// 여러 지점을 한 번에 다 요청하면(동시 100개 이상) 카카오의 요청제한(rate limit)에
+// 걸려서 일부 구역이 조용히 누락될 수 있습니다. 그래서 한 번에 BATCH_SIZE개씩만
+// 동시에 요청하고, 그 배치가 끝나면 다음 배치를 요청하는 방식으로 나눠서 보냅니다.
+async function runInBatches(tasks, batchSize) {
+  const results = [];
+  for (let i = 0; i < tasks.length; i += batchSize) {
+    const batch = tasks.slice(i, i + batchSize);
+    const batchResults = await Promise.all(batch.map((task) => task()));
+    results.push(...batchResults);
+  }
+  return results;
+}
+
 // ---------------------------------------------------------------
 // 카카오 로컬 API는 한 번의 검색(중심점+반경)당 최대 45개까지만 돌려줍니다.
 // 반경 안에 식당이 45개보다 많으면 뒤에 있는 곳들이 통째로 누락돼요.
 // 특히 공덕역 인근처럼 상권이 밀집된 곳은 900m~1.5km 반경 안에도 식당이
-// 45개를 훌쩍 넘을 수 있어서, 격자를 더 촘촘하게(5x5=25개 지점) 나눠
+// 45개를 훌쩍 넘을 수 있어서, 격자를 촘촘하게(5x5=25개 지점) 나눠
 // 각 지점이 담당하는 구역을 좁혀 45개 상한에 덜 걸리도록 합니다.
 //
 // 격자 간격(spacing)과 각 지점의 검색 반경(subRadius)은 SEARCH_RADIUS_METERS에
@@ -153,7 +155,7 @@ export async function GET() {
     const fetchTasks = [];
     SEARCH_GROUP_CODES.forEach((groupCode) => {
       gridPoints.forEach((point) => {
-        fetchTasks.push(
+        fetchTasks.push(() =>
           fetchAllPagesForPoint({
             groupCode,
             apiKey,
@@ -165,7 +167,8 @@ export async function GET() {
       });
     });
 
-    const documentsByPoint = await Promise.all(fetchTasks);
+    // 동시에 8개씩만 배치로 요청 (카카오 요청제한 회피)
+    const documentsByPoint = await runInBatches(fetchTasks, 8);
 
     const restaurantMap = new Map();
 
@@ -196,6 +199,7 @@ export async function GET() {
         priceRange: "정보 없음",
         groupSize: "정보 없음",
         waiting: "정보 없음",
+        source: "kakao",
       });
     });
 

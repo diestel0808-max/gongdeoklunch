@@ -1,0 +1,230 @@
+"use client";
+
+import { useState } from "react";
+import { CATEGORIES } from "@/lib/constants";
+import { addCustomRestaurant } from "@/lib/customRestaurantStorage";
+import { loadKakaoMapScript } from "@/lib/kakaoLoader";
+
+export default function AddRestaurantModal({ onClose, onAdded }) {
+  const [keyword, setKeyword] = useState("");
+  const [results, setResults] = useState([]);
+  const [selectedPlace, setSelectedPlace] = useState(null);
+  const [category, setCategory] = useState("");
+  const [status, setStatus] = useState("idle"); // idle | searching | error
+  const [errorMessage, setErrorMessage] = useState("");
+
+  const categoryOptions = CATEGORIES.filter((c) => c !== "전체");
+
+  const handleSearch = async () => {
+    if (!keyword.trim()) return;
+    setStatus("searching");
+    setErrorMessage("");
+    setSelectedPlace(null);
+
+    try {
+      const appKey = process.env.NEXT_PUBLIC_KAKAO_JS_KEY;
+      const kakao = await loadKakaoMapScript(appKey);
+
+      const places = new kakao.maps.services.Places();
+      places.keywordSearch(keyword.trim(), (data, statusCode) => {
+        if (statusCode === kakao.maps.services.Status.OK) {
+          setResults(data);
+          setStatus("idle");
+        } else {
+          setResults([]);
+          setStatus("idle");
+          setErrorMessage("검색 결과가 없어요. 다른 검색어로 시도해보세요.");
+        }
+      });
+    } catch (error) {
+      setStatus("error");
+      setErrorMessage("지도 서비스를 불러오지 못했어요. 잠시 후 다시 시도해주세요.");
+    }
+  };
+
+  const handleSubmit = () => {
+    if (!selectedPlace) {
+      setErrorMessage("먼저 검색 결과에서 식당을 선택해주세요.");
+      return;
+    }
+    if (!category) {
+      setErrorMessage("카테고리를 선택해주세요.");
+      return;
+    }
+
+    addCustomRestaurant({
+      placeName: selectedPlace.place_name,
+      address: selectedPlace.road_address_name || selectedPlace.address_name,
+      lat: Number(selectedPlace.y),
+      lng: Number(selectedPlace.x),
+      category,
+      kakaoMapUrl: selectedPlace.place_url,
+      phone: selectedPlace.phone,
+    });
+
+    onAdded();
+  };
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(27,42,52,0.5)",
+        display: "flex",
+        alignItems: "flex-end",
+        justifyContent: "center",
+        zIndex: 60,
+      }}
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "#fff",
+          width: "100%",
+          maxWidth: 480,
+          maxHeight: "85vh",
+          overflowY: "auto",
+          borderRadius: "16px 16px 0 0",
+          padding: 20,
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 12,
+          }}
+        >
+          <h2 style={{ fontSize: 16, fontWeight: 700 }}>식당 등록하기</h2>
+          <button
+            onClick={onClose}
+            style={{ border: "none", background: "transparent", fontSize: 18, cursor: "pointer" }}
+          >
+            ✕
+          </button>
+        </div>
+
+        <p style={{ fontSize: 12, color: "#999", marginBottom: 12 }}>
+          목록에 없는 식당을 카카오맵에서 검색해서 추가할 수 있어요.
+        </p>
+
+        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+          <input
+            value={keyword}
+            onChange={(e) => setKeyword(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+            placeholder="식당 이름 검색 (예: 두껍삼)"
+            style={{
+              flex: 1,
+              padding: "8px 10px",
+              borderRadius: 8,
+              border: "1px solid var(--color-gray-300)",
+              fontSize: 13,
+            }}
+          />
+          <button
+            onClick={handleSearch}
+            style={{
+              padding: "0 16px",
+              borderRadius: 8,
+              border: "none",
+              background: "var(--color-navy)",
+              color: "#fff",
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            검색
+          </button>
+        </div>
+
+        {status === "searching" && (
+          <p style={{ fontSize: 12, color: "#999", marginBottom: 12 }}>검색 중...</p>
+        )}
+
+        {results.length > 0 && (
+          <div style={{ marginBottom: 16, maxHeight: 220, overflowY: "auto" }}>
+            {results.map((place) => {
+              const isSelected = selectedPlace?.id === place.id;
+              return (
+                <button
+                  key={place.id}
+                  onClick={() => setSelectedPlace(place)}
+                  style={{
+                    display: "block",
+                    width: "100%",
+                    textAlign: "left",
+                    padding: "10px 12px",
+                    borderRadius: 8,
+                    border: isSelected
+                      ? "2px solid var(--color-teal)"
+                      : "1px solid var(--color-gray-300)",
+                    background: isSelected ? "var(--color-teal-light)" : "#fff",
+                    marginBottom: 6,
+                    cursor: "pointer",
+                  }}
+                >
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>{place.place_name}</div>
+                  <div style={{ fontSize: 11, color: "#999", marginTop: 2 }}>
+                    {place.road_address_name || place.address_name}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {selectedPlace && (
+          <div style={{ marginBottom: 16 }}>
+            <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>카테고리 선택</p>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {categoryOptions.map((option) => (
+                <button
+                  key={option}
+                  onClick={() => setCategory(option)}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: 20,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    border: category === option ? "none" : "1px solid var(--color-gray-300)",
+                    background: category === option ? "var(--color-teal)" : "#fff",
+                    color: category === option ? "#fff" : "var(--color-text)",
+                    cursor: "pointer",
+                  }}
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {errorMessage && (
+          <p style={{ fontSize: 12, color: "#d33", marginBottom: 12 }}>{errorMessage}</p>
+        )}
+
+        <button
+          onClick={handleSubmit}
+          style={{
+            width: "100%",
+            padding: "12px 0",
+            borderRadius: 8,
+            border: "none",
+            background: "var(--color-navy)",
+            color: "#fff",
+            fontWeight: 700,
+            fontSize: 14,
+            cursor: "pointer",
+          }}
+        >
+          등록하기
+        </button>
+      </div>
+    </div>
+  );
+}

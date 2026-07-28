@@ -2,34 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { OFFICE } from "@/lib/constants";
-
-function loadKakaoMapScript(appKey) {
-  return new Promise((resolve, reject) => {
-    if (window.kakao && window.kakao.maps) {
-      resolve(window.kakao);
-      return;
-    }
-
-    const existingScript = document.getElementById("kakao-map-sdk");
-    if (existingScript) {
-      existingScript.addEventListener("load", () => {
-        window.kakao.maps.load(() => resolve(window.kakao));
-      });
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.id = "kakao-map-sdk";
-    // libraries=services는 나중에 주소검색(식당 등록 기능)에서 필요해서 미리 포함
-    script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${appKey}&autoload=false&libraries=services`;
-    script.async = true;
-    script.onload = () => {
-      window.kakao.maps.load(() => resolve(window.kakao));
-    };
-    script.onerror = reject;
-    document.head.appendChild(script);
-  });
-}
+import { loadKakaoMapScript } from "@/lib/kakaoLoader";
 
 // restaurants: 지도에 표시할 식당 목록
 // onMarkerClick: 식당 마커를 클릭했을 때 호출 (식당 객체를 인자로 받음)
@@ -57,10 +30,26 @@ export default function KakaoMap({ restaurants = [], onMarkerClick }) {
           level: 4,
         });
 
-        // 회사 위치 마커
-        const officeMarker = new kakao.maps.Marker({ position: officePosition, map });
+        // 회사 위치는 일반 식당 마커보다 훨씬 크고 눈에 띄는 커스텀 핀으로 표시
+        const officeMarkerSvg = `
+          <svg xmlns="http://www.w3.org/2000/svg" width="46" height="58" viewBox="0 0 46 58">
+            <path d="M23 0C10.3 0 0 10.3 0 23c0 17.3 23 35 23 35s23-17.7 23-35C46 10.3 35.7 0 23 0z" fill="#1b2a34"/>
+            <circle cx="23" cy="23" r="15" fill="#1bc5d8"/>
+            <text x="23" y="29" font-size="16" text-anchor="middle" fill="#ffffff">🏢</text>
+          </svg>`;
+        const officeMarkerImage = new kakao.maps.MarkerImage(
+          `data:image/svg+xml;base64,${btoa(officeMarkerSvg)}`,
+          new kakao.maps.Size(46, 58),
+          { offset: new kakao.maps.Point(23, 58) }
+        );
+        const officeMarker = new kakao.maps.Marker({
+          position: officePosition,
+          map,
+          image: officeMarkerImage,
+          zIndex: 10,
+        });
         const officeInfo = new kakao.maps.InfoWindow({
-          content: `<div style="padding:6px 10px;font-size:12px;">🏢 ${OFFICE.name}</div>`,
+          content: `<div style="padding:6px 10px;font-size:12px;font-weight:700;">🏢 ${OFFICE.name}</div>`,
         });
         officeInfo.open(map, officeMarker);
 
@@ -88,7 +77,7 @@ export default function KakaoMap({ restaurants = [], onMarkerClick }) {
         });
 
         if (restaurants.length > 0) {
-          map.setBounds(bounds);
+          map.setBounds(bounds, 40, 40, 40, 40);
         }
 
         setStatus("ready");
