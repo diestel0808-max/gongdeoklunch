@@ -1,17 +1,22 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import KakaoMap from "@/components/KakaoMap";
 import ReviewModal from "@/components/ReviewModal";
 import { CATEGORIES, OFFICE } from "@/lib/constants";
 import { getReviewsForRestaurant, summarizeReviews } from "@/lib/reviewStorage";
+import { cacheRestaurants } from "@/lib/restaurantCache";
+
+function joinValues(value) {
+  return Array.isArray(value) ? value.join(", ") : value;
+}
 
 function RestaurantCard({ restaurant, onWriteReview }) {
   const [showReviews, setShowReviews] = useState(false);
   const [reviews, setReviews] = useState([]);
   const [summary, setSummary] = useState(null);
 
-  // 후기 개수는 카드가 처음 보일 때 한 번 불러와서 요약 표시
   useEffect(() => {
     const list = getReviewsForRestaurant(restaurant.id);
     setReviews(list);
@@ -92,6 +97,20 @@ function RestaurantCard({ restaurant, onWriteReview }) {
         >
           카카오맵에서 보기
         </a>
+        <Link
+          href={`/restaurant/${restaurant.id}`}
+          target="_blank"
+          style={{
+            fontSize: 12,
+            fontWeight: 600,
+            color: "var(--color-navy)",
+            border: "1px solid var(--color-gray-300)",
+            borderRadius: 6,
+            padding: "6px 10px",
+          }}
+        >
+          상세보기
+        </Link>
         <button
           onClick={() => onWriteReview(restaurant, refreshReviews)}
           style={{
@@ -143,8 +162,8 @@ function RestaurantCard({ restaurant, onWriteReview }) {
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap", fontSize: 11 }}>
                 <span style={{ fontWeight: 700 }}>{review.nickname}</span>
                 <span style={{ color: "#999" }}>·</span>
-                <span style={{ color: "#666" }}>⏱ {review.waiting}</span>
-                <span style={{ color: "#666" }}>👥 {review.companion}</span>
+                <span style={{ color: "#666" }}>⏱ {joinValues(review.waiting)}</span>
+                <span style={{ color: "#666" }}>👥 {joinValues(review.companion)}</span>
                 <span style={{ color: "#666" }}>💰 {review.priceFeel}</span>
                 <span style={{ color: "#666" }}>🔁 {review.revisit}</span>
               </div>
@@ -161,10 +180,11 @@ function RestaurantCard({ restaurant, onWriteReview }) {
 
 export default function HomePage() {
   const [activeCategory, setActiveCategory] = useState("전체");
+  const [searchQuery, setSearchQuery] = useState("");
   const [restaurants, setRestaurants] = useState([]);
   const [status, setStatus] = useState("loading"); // loading | ready | error
   const [errorMessage, setErrorMessage] = useState("");
-  const [reviewTarget, setReviewTarget] = useState(null); // { restaurant, onDone }
+  const [reviewTarget, setReviewTarget] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -177,7 +197,9 @@ export default function HomePage() {
       })
       .then((data) => {
         if (!isMounted) return;
-        setRestaurants(data.restaurants || []);
+        const list = data.restaurants || [];
+        setRestaurants(list);
+        cacheRestaurants(list);
         setStatus("ready");
       })
       .catch((err) => {
@@ -192,9 +214,19 @@ export default function HomePage() {
   }, []);
 
   const filteredRestaurants = useMemo(() => {
-    if (activeCategory === "전체") return restaurants;
-    return restaurants.filter((r) => r.category === activeCategory);
-  }, [restaurants, activeCategory]);
+    let list = restaurants;
+
+    if (activeCategory !== "전체") {
+      list = list.filter((r) => r.category === activeCategory);
+    }
+
+    const query = searchQuery.trim();
+    if (query) {
+      list = list.filter((r) => r.name.includes(query));
+    }
+
+    return list;
+  }, [restaurants, activeCategory, searchQuery]);
 
   return (
     <main style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
@@ -227,8 +259,24 @@ export default function HomePage() {
         </button>
       </header>
 
-      <div style={{ height: "45vh", minHeight: 240 }}>
+      <div style={{ height: "40vh", minHeight: 220 }}>
         <KakaoMap restaurants={filteredRestaurants} />
+      </div>
+
+      {/* 검색창 */}
+      <div style={{ padding: "10px 16px 0" }}>
+        <input
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="식당 이름으로 검색 (예: 두껍삼)"
+          style={{
+            width: "100%",
+            padding: "10px 12px",
+            borderRadius: 8,
+            border: "1px solid var(--color-gray-300)",
+            fontSize: 13,
+          }}
+        />
       </div>
 
       <div
@@ -286,7 +334,9 @@ export default function HomePage() {
 
         {status === "ready" && filteredRestaurants.length === 0 && (
           <p style={{ fontSize: 13, color: "#999", padding: "24px 0" }}>
-            해당 카테고리에 등록된 식당이 아직 없어요.
+            {searchQuery
+              ? `"${searchQuery}"에 해당하는 식당을 찾을 수 없어요.`
+              : "해당 카테고리에 등록된 식당이 아직 없어요."}
           </p>
         )}
 

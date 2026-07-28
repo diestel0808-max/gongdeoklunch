@@ -7,7 +7,7 @@ import {
   REVISIT_OPTIONS,
   WAITING_LEVELS,
 } from "@/lib/constants";
-import { addReview, getProfile, saveProfile } from "@/lib/reviewStorage";
+import { addReview, clearProfile, getProfile, saveProfile } from "@/lib/reviewStorage";
 
 const chipStyle = (isActive) => ({
   padding: "6px 12px",
@@ -20,7 +20,31 @@ const chipStyle = (isActive) => ({
   cursor: "pointer",
 });
 
-function ChipGroup({ label, options, value, onChange }) {
+// 여러 개 선택 가능한 칩 그룹 (웨이팅, 추천 동행에서 사용)
+function MultiChipGroup({ label, options, values, onToggle }) {
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>
+        {label} <span style={{ fontWeight: 400, color: "#999" }}>(복수 선택 가능)</span>
+      </p>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        {options.map((option) => (
+          <button
+            key={option}
+            type="button"
+            style={chipStyle(values.includes(option))}
+            onClick={() => onToggle(option)}
+          >
+            {option}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// 하나만 선택 가능한 칩 그룹 (가격 체감, 재방문 의사에서 사용)
+function SingleChipGroup({ label, options, value, onChange }) {
   return (
     <div style={{ marginBottom: 16 }}>
       <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>{label}</p>
@@ -43,29 +67,55 @@ function ChipGroup({ label, options, value, onChange }) {
 export default function ReviewModal({ restaurant, onClose, onSubmitted }) {
   const existingProfile = getProfile();
 
-  const [nickname, setNickname] = useState(existingProfile?.nickname || "");
-  const [pin, setPin] = useState(existingProfile?.pin || "");
-  const [waiting, setWaiting] = useState("");
-  const [companion, setCompanion] = useState("");
+  // 프로필이 이미 있으면 그대로 재사용 (매번 다시 입력받지 않음)
+  const [profile, setProfile] = useState(existingProfile);
+  const [isEditingProfile, setIsEditingProfile] = useState(!existingProfile);
+  const [nicknameInput, setNicknameInput] = useState(existingProfile?.nickname || "");
+  const [pinInput, setPinInput] = useState(existingProfile?.pin || "");
+
+  const [waiting, setWaiting] = useState([]);
+  const [companion, setCompanion] = useState([]);
   const [priceFeel, setPriceFeel] = useState("");
   const [revisit, setRevisit] = useState("");
   const [comment, setComment] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
-  const handleSubmit = () => {
-    if (!nickname.trim() || pin.trim().length !== 4) {
-      setErrorMessage("닉네임과 4자리 PIN을 모두 입력해주세요.");
+  const toggleValue = (list, setList, value) => {
+    setList(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
+  };
+
+  const handleConfirmProfile = () => {
+    if (!nicknameInput.trim() || pinInput.trim().length !== 4) {
+      setErrorMessage("닉네임과 4자리 PIN을 입력해주세요.");
       return;
     }
-    if (!waiting || !companion || !priceFeel || !revisit) {
+    const newProfile = { nickname: nicknameInput.trim(), pin: pinInput.trim() };
+    saveProfile(newProfile);
+    setProfile(newProfile);
+    setIsEditingProfile(false);
+    setErrorMessage("");
+  };
+
+  const handleSwitchProfile = () => {
+    clearProfile();
+    setProfile(null);
+    setNicknameInput("");
+    setPinInput("");
+    setIsEditingProfile(true);
+  };
+
+  const handleSubmit = () => {
+    if (!profile) {
+      setErrorMessage("먼저 닉네임과 PIN을 설정해주세요.");
+      return;
+    }
+    if (waiting.length === 0 || companion.length === 0 || !priceFeel || !revisit) {
       setErrorMessage("웨이팅 / 추천 동행 / 가격 체감 / 재방문 의사를 모두 선택해주세요.");
       return;
     }
 
-    saveProfile({ nickname: nickname.trim(), pin: pin.trim() });
-
     addReview(restaurant.id, {
-      nickname: nickname.trim(),
+      nickname: profile.nickname,
       waiting,
       companion,
       priceFeel,
@@ -118,58 +168,107 @@ export default function ReviewModal({ restaurant, onClose, onSubmitted }) {
           </button>
         </div>
 
-        {/* 닉네임 + PIN */}
-        <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-          <input
-            placeholder="닉네임 (예: 공덕맛집탐험가)"
-            value={nickname}
-            onChange={(e) => setNickname(e.target.value)}
+        {/* 프로필 영역: 이미 설정되어 있으면 읽기 전용으로 표시, 없으면 설정 폼 */}
+        {!isEditingProfile && profile ? (
+          <div
             style={{
-              flex: 2,
-              padding: "8px 10px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              background: "var(--color-teal-light)",
               borderRadius: 8,
-              border: "1px solid var(--color-gray-300)",
-              fontSize: 13,
+              padding: "10px 12px",
+              marginBottom: 16,
             }}
-          />
-          <input
-            placeholder="PIN 4자리"
-            value={pin}
-            maxLength={4}
-            inputMode="numeric"
-            onChange={(e) => setPin(e.target.value.replace(/[^0-9]/g, ""))}
-            style={{
-              flex: 1,
-              padding: "8px 10px",
-              borderRadius: 8,
-              border: "1px solid var(--color-gray-300)",
-              fontSize: 13,
-            }}
-          />
-        </div>
-        <p style={{ fontSize: 11, color: "#999", marginTop: -10, marginBottom: 16 }}>
-          닉네임+PIN은 "내가 쓴 후기 모아보기"용 열쇠예요. 처음이면 자유롭게 정해주세요.
-        </p>
+          >
+            <span style={{ fontSize: 13, fontWeight: 600 }}>
+              "{profile.nickname}" 님으로 작성됩니다
+            </span>
+            <button
+              onClick={handleSwitchProfile}
+              style={{
+                fontSize: 11,
+                color: "#666",
+                background: "transparent",
+                border: "none",
+                textDecoration: "underline",
+                cursor: "pointer",
+              }}
+            >
+              다른 사람으로 전환
+            </button>
+          </div>
+        ) : (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input
+                placeholder="닉네임 (예: 공덕맛집탐험가)"
+                value={nicknameInput}
+                onChange={(e) => setNicknameInput(e.target.value)}
+                style={{
+                  flex: 2,
+                  padding: "8px 10px",
+                  borderRadius: 8,
+                  border: "1px solid var(--color-gray-300)",
+                  fontSize: 13,
+                }}
+              />
+              <input
+                placeholder="PIN 4자리"
+                value={pinInput}
+                maxLength={4}
+                inputMode="numeric"
+                onChange={(e) => setPinInput(e.target.value.replace(/[^0-9]/g, ""))}
+                style={{
+                  flex: 1,
+                  padding: "8px 10px",
+                  borderRadius: 8,
+                  border: "1px solid var(--color-gray-300)",
+                  fontSize: 13,
+                }}
+              />
+              <button
+                onClick={handleConfirmProfile}
+                style={{
+                  padding: "0 14px",
+                  borderRadius: 8,
+                  border: "none",
+                  background: "var(--color-navy)",
+                  color: "#fff",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                확인
+              </button>
+            </div>
+            <p style={{ fontSize: 11, color: "#999", marginTop: 6 }}>
+              한 번 정하면 이 브라우저에서 계속 이 닉네임으로 후기가 남겨져요. (매번 다시 입력할
+              필요 없음)
+            </p>
+          </div>
+        )}
 
-        <ChipGroup
+        <MultiChipGroup
           label="웨이팅 정도"
           options={WAITING_LEVELS}
-          value={waiting}
-          onChange={setWaiting}
+          values={waiting}
+          onToggle={(v) => toggleValue(waiting, setWaiting, v)}
         />
-        <ChipGroup
+        <MultiChipGroup
           label="추천 동행"
           options={COMPANION_TAGS}
-          value={companion}
-          onChange={setCompanion}
+          values={companion}
+          onToggle={(v) => toggleValue(companion, setCompanion, v)}
         />
-        <ChipGroup
+        <SingleChipGroup
           label="가격 체감"
           options={PRICE_FEEL_OPTIONS}
           value={priceFeel}
           onChange={setPriceFeel}
         />
-        <ChipGroup
+        <SingleChipGroup
           label="재방문 의사"
           options={REVISIT_OPTIONS}
           value={revisit}

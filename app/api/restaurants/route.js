@@ -20,14 +20,23 @@ function classifyCategory(categoryName, placeName) {
   return FALLBACK_CATEGORY;
 }
 
-// 카카오 "카테고리로 장소 검색" API - 이름에 단어가 없어도 해당 그룹(FD6/CE7)이면 전부 나옴
-// 한 번에 최대 15개까지만 주므로, 여러 페이지를 이어서 요청
-async function searchKakaoCategory({ groupCode, apiKey, page }) {
+// 미터 단위 오프셋을 위/경도 오프셋으로 변환 (독막로 331 위도 기준 근사치)
+function metersToLatLngOffset(offsetMetersLat, offsetMetersLng, baseLat) {
+  const metersPerDegLat = 111320;
+  const metersPerDegLng = 111320 * Math.cos((baseLat * Math.PI) / 180);
+  return {
+    dLat: offsetMetersLat / metersPerDegLat,
+    dLng: offsetMetersLng / metersPerDegLng,
+  };
+}
+
+// 카카오 "카테고리로 장소 검색" API 1페이지 호출
+async function searchKakaoCategory({ groupCode, apiKey, page, centerLat, centerLng, radius }) {
   const url = new URL("https://dapi.kakao.com/v2/local/search/category.json");
   url.searchParams.set("category_group_code", groupCode);
-  url.searchParams.set("x", String(OFFICE.lng));
-  url.searchParams.set("y", String(OFFICE.lat));
-  url.searchParams.set("radius", String(SEARCH_RADIUS_METERS));
+  url.searchParams.set("x", String(centerLng));
+  url.searchParams.set("y", String(centerLat));
+  url.searchParams.set("radius", String(radius));
   url.searchParams.set("sort", "distance");
   url.searchParams.set("size", "15");
   url.searchParams.set("page", String(page));
@@ -47,19 +56,48 @@ async function searchKakaoCategory({ groupCode, apiKey, page }) {
   return response.json();
 }
 
-// 한 그룹코드(FD6/CE7)에 대해 여러 페이지를 끝까지(또는 최대 pageLimit까지) 가져오기
-async function fetchAllPages({ groupCode, apiKey, pageLimit = 5 }) {
+// 한 중심점에서 최대 3페이지(45개, 카카오 API 상한)까지 가져오기
+async function fetchAllPagesForPoint({ groupCode, apiKey, centerLat, centerLng, radius }) {
   const allDocuments = [];
 
-  for (let page = 1; page <= pageLimit; page += 1) {
-    const data = await searchKakaoCategory({ groupCode, apiKey, page });
+  for (let page = 1; page <= 3; page += 1) {
+    const data = await searchKakaoCategory({
+      groupCode,
+      apiKey,
+      page,
+      centerLat,
+      centerLng,
+      radius,
+    });
     allDocuments.push(...(data.documents || []));
-
-    // 카카오 응답의 is_end가 true면 더 이상 페이지가 없다는 뜻
     if (data.meta?.is_end) break;
   }
 
   return allDocuments;
+}
+
+// ---------------------------------------------------------------
+// 카카오 로컬 API는 한 번의 검색(중심점+반경)당 최대 45개까지만 돌려줍니다.
+// 반경 안에 식당이 45개보다 많으면 뒤에 있는 곳들이 통째로 누락돼요.
+// 그래서 큰 반경 하나로 검색하는 대신, 반경을 3x3 격자(9개 지점)로
+// 잘게 나눠서 각각 검색한 뒤 결과를 합치는 방식으로 보완합니다.
+// ---------------------------------------------------------------
+function buildSearchGridPoints() {
+  const offsetsMeters = [-350, 0, 350]; // 격자 간격(미터)
+  const subRadius = 500; // 각 지점에서 검색할 반경(겹치게 해서 누락 방지)
+
+  const points = [];
+  offsetsMeters.forEach((offsetLat) => {
+    offsetsMeters.forEach((offsetLng) => {
+      const { dLat, dLng } = metersToLatLngOffset(offsetLat, offsetLng, OFFICE.lat);
+      points.push({
+        centerLat: OFFICE.lat + dLat,
+        centerLng: OFFICE.lng + dLng,
+        radius: subRadius,
+      });
+    });
+  });
+  return points;
 }
 
 export async function GET() {
@@ -76,18 +114,37 @@ export async function GET() {
   }
 
   try {
-    const documentsByGroup = await Promise.all(
-      SEARCH_GROUP_CODES.map((groupCode) => fetchAllPages({ groupCode, apiKey }))
-    );
+    const gridPoints = buildSearchGridPoints();
+
+    const fetchTasks = [];
+    SEARCH_GROUP_CODES.forEach((groupCode) => {
+      gridPoints.forEach((point) => {
+        fetchTasks.push(
+          fetchAllPagesForPoint({
+            groupCode,
+            apiKey,
+            centerLat: point.centerLat,
+            centerLng: point.centerLng,
+            radius: point.radius,
+          })
+        );
+      });
+    });
+
+    const documentsByPoint = await Promise.all(fetchTasks);
 
     const restaurantMap = new Map();
 
-    documentsByGroup.flat().forEach((doc) => {
+    documentsByPoint.flat().forEach((doc) => {
       if (restaurantMap.has(doc.id)) return;
 
       const lat = Number(doc.y);
       const lng = Number(doc.x);
       const distanceMeters = getDistanceMeters(OFFICE.lat, OFFICE.lng, lat, lng);
+
+      // 격자 검색 특성상 반경 밖의 결과가 섞일 수 있어 최종적으로 한 번 더 필터링
+      if (distanceMeters > SEARCH_RADIUS_METERS) return;
+
       const category = classifyCategory(doc.category_name || "", doc.place_name || "");
 
       restaurantMap.set(doc.id, {
