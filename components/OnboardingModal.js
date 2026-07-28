@@ -33,6 +33,11 @@ export default function OnboardingModal({ onClose, onComplete }) {
 
     if (!result.ok) {
       setLoginError(result.message);
+      // 등록된 적 없는 닉네임이면, 바로 가입할 수 있도록 아래 섹션을 자동으로 펼치고 닉네임을 채워줌
+      if (result.message.includes("등록되지 않은")) {
+        setShowSignup(true);
+        setSignupNickname(nickname);
+      }
       return;
     }
 

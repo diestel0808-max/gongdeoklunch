@@ -9,7 +9,8 @@ import {
   REVISIT_OPTIONS,
   WAITING_LEVELS,
 } from "@/lib/constants";
-import { addReview, getProfile, saveProfile, verifyOrCreateProfile } from "@/lib/reviewStorage";
+import OnboardingModal from "@/components/OnboardingModal";
+import { addReview, getProfile } from "@/lib/reviewStorage";
 
 const chipStyle = (isActive) => ({
   padding: "6px 12px",
@@ -67,13 +68,7 @@ function SingleChipGroup({ label, options, value, onChange }) {
 }
 
 export default function ReviewModal({ restaurant, onClose, onSubmitted }) {
-  const existingProfile = getProfile();
-
-  // 프로필이 이미 있으면 그대로 재사용 (매번 다시 입력받지 않음)
-  const [profile, setProfile] = useState(existingProfile);
-  const [isEditingProfile, setIsEditingProfile] = useState(!existingProfile);
-  const [nicknameInput, setNicknameInput] = useState(existingProfile?.nickname || "");
-  const [pinInput, setPinInput] = useState(existingProfile?.pin || "");
+  const [profile, setProfile] = useState(getProfile());
 
   const [waiting, setWaiting] = useState([]);
   const [headcount, setHeadcount] = useState([]);
@@ -84,37 +79,21 @@ export default function ReviewModal({ restaurant, onClose, onSubmitted }) {
   const [menu, setMenu] = useState("");
   const [comment, setComment] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
-  const [isVerifying, setIsVerifying] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const toggleValue = (list, setList, value) => {
     setList(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
   };
 
-  const handleConfirmProfile = async () => {
-    if (!nicknameInput.trim() || pinInput.trim().length !== 6) {
-      setErrorMessage("닉네임과 6자리 PIN을 입력해주세요.");
-      return;
-    }
-    setIsVerifying(true);
-    setErrorMessage("");
-
-    const nickname = nicknameInput.trim();
-    const pin = pinInput.trim();
-    const result = await verifyOrCreateProfile(nickname, pin);
-
-    setIsVerifying(false);
-
-    if (!result.ok) {
-      setErrorMessage(result.message);
-      return;
-    }
-
-    const newProfile = { nickname, pin };
-    saveProfile(newProfile);
-    setProfile(newProfile);
-    setIsEditingProfile(false);
-  };
+  // 아직 닉네임을 정한 적 없는 브라우저면, 후기 폼 대신 온보딩 팝업부터 띄움
+  if (!profile) {
+    return (
+      <OnboardingModal
+        onClose={onClose}
+        onComplete={(newProfile) => setProfile(newProfile)}
+      />
+    );
+  }
 
   const handleSubmit = async () => {
     if (!profile) {
@@ -200,76 +179,19 @@ export default function ReviewModal({ restaurant, onClose, onSubmitted }) {
           </button>
         </div>
 
-        {/* 프로필 영역: 이미 설정되어 있으면 읽기 전용으로 표시 (전환 불가 - 이 브라우저의 고정 닉네임) */}
-        {!isEditingProfile && profile ? (
-          <div
-            style={{
-              background: "var(--color-teal-light)",
-              borderRadius: 8,
-              padding: "10px 12px",
-              marginBottom: 16,
-            }}
-          >
-            <span style={{ fontSize: 13, fontWeight: 600 }}>
-              "{profile.nickname}" 님으로 작성됩니다
-            </span>
-          </div>
-        ) : (
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ display: "flex", gap: 8 }}>
-              <input
-                placeholder="닉네임 (예: 공덕맛집탐험가)"
-                value={nicknameInput}
-                onChange={(e) => setNicknameInput(e.target.value)}
-                style={{
-                  flex: 2,
-                  padding: "8px 10px",
-                  borderRadius: 8,
-                  border: "1px solid var(--color-gray-300)",
-                  fontSize: 13,
-                }}
-              />
-              <input
-                placeholder="PIN 6자리"
-                value={pinInput}
-                maxLength={6}
-                inputMode="numeric"
-                onChange={(e) => setPinInput(e.target.value.replace(/[^0-9]/g, ""))}
-                style={{
-                  flex: 1,
-                  padding: "8px 10px",
-                  borderRadius: 8,
-                  border: "1px solid var(--color-gray-300)",
-                  fontSize: 13,
-                }}
-              />
-              <button
-                onClick={handleConfirmProfile}
-                disabled={isVerifying}
-                style={{
-                  padding: "0 14px",
-                  borderRadius: 8,
-                  border: "none",
-                  background: "var(--color-navy)",
-                  color: "#fff",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: isVerifying ? "default" : "pointer",
-                  opacity: isVerifying ? 0.6 : 1,
-                }}
-              >
-                {isVerifying ? "확인 중..." : "확인"}
-              </button>
-            </div>
-            <p style={{ fontSize: 11, color: "#999", marginTop: 6 }}>
-              한 번 정하면 이 브라우저에서 계속 이 닉네임으로 후기가 남겨져요. (매번 다시 입력할
-              필요 없음)
-            </p>
-            <p style={{ fontSize: 11, color: "#d9822b", marginTop: 4, fontWeight: 600 }}>
-              ⚠️ 닉네임은 한 번 정하면 이후 수정이 어려워요. 신중하게 정해주세요!
-            </p>
-          </div>
-        )}
+        {/* profile은 위에서 이미 보장됨 - 닉네임 표시만 */}
+        <div
+          style={{
+            background: "var(--color-teal-light)",
+            borderRadius: 8,
+            padding: "10px 12px",
+            marginBottom: 16,
+          }}
+        >
+          <span style={{ fontSize: 13, fontWeight: 600 }}>
+            "{profile.nickname}" 님으로 작성됩니다
+          </span>
+        </div>
 
         <MultiChipGroup
           label="웨이팅 정도"
