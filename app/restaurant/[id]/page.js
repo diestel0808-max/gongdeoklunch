@@ -64,7 +64,7 @@ export default function RestaurantDetailPage() {
     <main style={{ maxWidth: 480, margin: "0 auto", minHeight: "100vh" }}>
       {/* 상단 지도 */}
       <div style={{ height: "35vh", minHeight: 200 }}>
-        <KakaoMap restaurants={[restaurant]} />
+        <KakaoMap restaurants={[restaurant]} showRoute />
       </div>
 
       <div style={{ padding: 20 }}>

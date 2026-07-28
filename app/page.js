@@ -1,32 +1,40 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import KakaoMap from "@/components/KakaoMap";
 import ReviewModal from "@/components/ReviewModal";
+import RestaurantDetailPanel from "@/components/RestaurantDetailPanel";
 import { CATEGORIES, OFFICE } from "@/lib/constants";
-import { getReviewsForRestaurant, summarizeReviews } from "@/lib/reviewStorage";
+import {
+  getReviewsForRestaurant,
+  hasLikedReview,
+  summarizeReviews,
+  toggleLikeReview,
+} from "@/lib/reviewStorage";
 import { cacheRestaurants } from "@/lib/restaurantCache";
 
 function joinValues(value) {
   return Array.isArray(value) ? value.join(", ") : value;
 }
 
-function RestaurantCard({ restaurant, onWriteReview }) {
-  const [showReviews, setShowReviews] = useState(false);
+function RestaurantCard({ restaurant, onWriteReview, onOpenDetail }) {
   const [reviews, setReviews] = useState([]);
   const [summary, setSummary] = useState(null);
-
-  useEffect(() => {
-    const list = getReviewsForRestaurant(restaurant.id);
-    setReviews(list);
-    setSummary(summarizeReviews(list));
-  }, [restaurant.id]);
 
   const refreshReviews = () => {
     const list = getReviewsForRestaurant(restaurant.id);
     setReviews(list);
     setSummary(summarizeReviews(list));
+  };
+
+  useEffect(() => {
+    refreshReviews();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restaurant.id]);
+
+  const handleLike = (reviewId) => {
+    toggleLikeReview(restaurant.id, reviewId);
+    refreshReviews();
   };
 
   return (
@@ -97,9 +105,8 @@ function RestaurantCard({ restaurant, onWriteReview }) {
         >
           카카오맵에서 보기
         </a>
-        <Link
-          href={`/restaurant/${restaurant.id}`}
-          target="_blank"
+        <button
+          onClick={() => onOpenDetail(restaurant)}
           style={{
             fontSize: 12,
             fontWeight: 600,
@@ -107,10 +114,12 @@ function RestaurantCard({ restaurant, onWriteReview }) {
             border: "1px solid var(--color-gray-300)",
             borderRadius: 6,
             padding: "6px 10px",
+            background: "#fff",
+            cursor: "pointer",
           }}
         >
           상세보기
-        </Link>
+        </button>
         <button
           onClick={() => onWriteReview(restaurant, refreshReviews)}
           style={{
@@ -126,21 +135,6 @@ function RestaurantCard({ restaurant, onWriteReview }) {
         >
           후기 남기기
         </button>
-        {reviews.length > 0 && (
-          <button
-            onClick={() => setShowReviews((v) => !v)}
-            style={{
-              fontSize: 12,
-              fontWeight: 600,
-              color: "var(--color-navy)",
-              background: "transparent",
-              border: "none",
-              cursor: "pointer",
-            }}
-          >
-            후기 {reviews.length}개 {showReviews ? "접기 ▲" : "보기 ▼"}
-          </button>
-        )}
         <button
           style={{
             fontSize: 12,
@@ -155,23 +149,46 @@ function RestaurantCard({ restaurant, onWriteReview }) {
         </button>
       </div>
 
-      {showReviews && (
+      {/* 후기는 접기/펼치기 없이 항상 전부 표시, 공감 많은 순 정렬 */}
+      {reviews.length > 0 && (
         <div style={{ marginTop: 12, borderTop: "1px solid var(--color-gray-300)", paddingTop: 10 }}>
-          {reviews.map((review) => (
-            <div key={review.id} style={{ marginBottom: 10 }}>
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", fontSize: 11 }}>
-                <span style={{ fontWeight: 700 }}>{review.nickname}</span>
-                <span style={{ color: "#999" }}>·</span>
-                <span style={{ color: "#666" }}>⏱ {joinValues(review.waiting)}</span>
-                <span style={{ color: "#666" }}>👥 {joinValues(review.companion)}</span>
-                <span style={{ color: "#666" }}>💰 {review.priceFeel}</span>
-                <span style={{ color: "#666" }}>🔁 {review.revisit}</span>
+          {reviews.map((review) => {
+            const liked = hasLikedReview(review);
+            return (
+              <div key={review.id} style={{ marginBottom: 10 }}>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", fontSize: 11 }}>
+                  <span style={{ fontWeight: 700 }}>{review.nickname}</span>
+                  <span style={{ color: "#999" }}>·</span>
+                  <span style={{ color: "#666" }}>⏱ {joinValues(review.waiting)}</span>
+                  <span style={{ color: "#666" }}>👥 {joinValues(review.companion)}</span>
+                  <span style={{ color: "#666" }}>💰 {review.priceFeel}</span>
+                  <span style={{ color: "#666" }}>🔁 {review.revisit}</span>
+                </div>
+                {review.comment && (
+                  <p style={{ fontSize: 12, marginTop: 4, color: "#333" }}>{review.comment}</p>
+                )}
+                <button
+                  onClick={() => handleLike(review.id)}
+                  style={{
+                    marginTop: 6,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                    fontSize: 11,
+                    fontWeight: 600,
+                    padding: "3px 9px",
+                    borderRadius: 20,
+                    border: liked ? "none" : "1px solid var(--color-gray-300)",
+                    background: liked ? "var(--color-teal)" : "#fff",
+                    color: liked ? "#fff" : "var(--color-text)",
+                    cursor: "pointer",
+                  }}
+                >
+                  👍 공감 {review.likes || 0}
+                </button>
               </div>
-              {review.comment && (
-                <p style={{ fontSize: 12, marginTop: 4, color: "#333" }}>{review.comment}</p>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
@@ -185,6 +202,7 @@ export default function HomePage() {
   const [status, setStatus] = useState("loading"); // loading | ready | error
   const [errorMessage, setErrorMessage] = useState("");
   const [reviewTarget, setReviewTarget] = useState(null);
+  const [detailTarget, setDetailTarget] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -260,10 +278,12 @@ export default function HomePage() {
       </header>
 
       <div style={{ height: "40vh", minHeight: 220 }}>
-        <KakaoMap restaurants={filteredRestaurants} />
+        <KakaoMap
+          restaurants={filteredRestaurants}
+          onMarkerClick={(restaurant) => setDetailTarget(restaurant)}
+        />
       </div>
 
-      {/* 검색창 */}
       <div style={{ padding: "10px 16px 0" }}>
         <input
           value={searchQuery}
@@ -345,6 +365,7 @@ export default function HomePage() {
             key={restaurant.id}
             restaurant={restaurant}
             onWriteReview={(target, onDone) => setReviewTarget({ restaurant: target, onDone })}
+            onOpenDetail={(target) => setDetailTarget(target)}
           />
         ))}
       </div>
@@ -358,6 +379,10 @@ export default function HomePage() {
             setReviewTarget(null);
           }}
         />
+      )}
+
+      {detailTarget && (
+        <RestaurantDetailPanel restaurant={detailTarget} onClose={() => setDetailTarget(null)} />
       )}
     </main>
   );

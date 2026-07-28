@@ -3,10 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { OFFICE } from "@/lib/constants";
 
-// 카카오맵 SDK 스크립트를 한 번만 불러오기 위한 헬퍼
 function loadKakaoMapScript(appKey) {
   return new Promise((resolve, reject) => {
-    // 이미 로드되어 있으면 다시 불러오지 않음
     if (window.kakao && window.kakao.maps) {
       resolve(window.kakao);
       return;
@@ -22,7 +20,8 @@ function loadKakaoMapScript(appKey) {
 
     const script = document.createElement("script");
     script.id = "kakao-map-sdk";
-    script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${appKey}&autoload=false`;
+    // libraries=services는 나중에 주소검색(식당 등록 기능)에서 필요해서 미리 포함
+    script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${appKey}&autoload=false&libraries=services`;
     script.async = true;
     script.onload = () => {
       window.kakao.maps.load(() => resolve(window.kakao));
@@ -32,9 +31,12 @@ function loadKakaoMapScript(appKey) {
   });
 }
 
-export default function KakaoMap({ restaurants = [] }) {
+// restaurants: 지도에 표시할 식당 목록
+// onMarkerClick: 식당 마커를 클릭했을 때 호출 (식당 객체를 인자로 받음)
+// showRoute: true면 회사 ↔ restaurants[0] 사이에 직선 경로선을 그림 (상세페이지에서 사용)
+export default function KakaoMap({ restaurants = [], onMarkerClick, showRoute = false }) {
   const mapContainerRef = useRef(null);
-  const [status, setStatus] = useState("loading"); // loading | ready | error
+  const [status, setStatus] = useState("loading");
 
   useEffect(() => {
     const appKey = process.env.NEXT_PUBLIC_KAKAO_JS_KEY;
@@ -50,38 +52,59 @@ export default function KakaoMap({ restaurants = [] }) {
       .then((kakao) => {
         if (!isMounted || !mapContainerRef.current) return;
 
-        const center = new kakao.maps.LatLng(OFFICE.lat, OFFICE.lng);
+        const officePosition = new kakao.maps.LatLng(OFFICE.lat, OFFICE.lng);
         const map = new kakao.maps.Map(mapContainerRef.current, {
-          center,
-          level: 4, // 숫자가 작을수록 확대
+          center: officePosition,
+          level: 4,
         });
 
-        // 회사 위치 마커 (강조 표시)
-        const officeMarker = new kakao.maps.Marker({
-          position: center,
-          map,
-        });
+        // 회사 위치 마커
+        const officeMarker = new kakao.maps.Marker({ position: officePosition, map });
         const officeInfo = new kakao.maps.InfoWindow({
           content: `<div style="padding:6px 10px;font-size:12px;">🏢 ${OFFICE.name}</div>`,
         });
         officeInfo.open(map, officeMarker);
 
-        // 식당 마커들
+        // 지도 범위를 자동으로 맞추기 위한 bounds
+        const bounds = new kakao.maps.LatLngBounds();
+        bounds.extend(officePosition);
+
         restaurants.forEach((restaurant) => {
           const position = new kakao.maps.LatLng(restaurant.lat, restaurant.lng);
+          bounds.extend(position);
+
           const marker = new kakao.maps.Marker({ position, map });
 
           const infoWindow = new kakao.maps.InfoWindow({
             content: `<div style="padding:6px 10px;font-size:12px;">${restaurant.name}</div>`,
           });
 
-          kakao.maps.event.addListener(marker, "mouseover", () => {
-            infoWindow.open(map, marker);
-          });
-          kakao.maps.event.addListener(marker, "mouseout", () => {
-            infoWindow.close();
-          });
+          kakao.maps.event.addListener(marker, "mouseover", () => infoWindow.open(map, marker));
+          kakao.maps.event.addListener(marker, "mouseout", () => infoWindow.close());
+
+          // 마커를 클릭하면 상세 정보로 이동할 수 있도록 콜백 연결
+          if (onMarkerClick) {
+            kakao.maps.event.addListener(marker, "click", () => onMarkerClick(restaurant));
+          }
         });
+
+        // 회사 ↔ 첫 번째 식당 사이에 직선 경로선 표시 (상세페이지 전용)
+        // 실제 도로를 따라가는 길찾기는 별도의 카카오 모빌리티(길찾기) API가 필요해서,
+        // 지금은 방향과 직선거리를 보여주는 용도로 점선을 그립니다.
+        if (showRoute && restaurants.length > 0) {
+          const destination = new kakao.maps.LatLng(restaurants[0].lat, restaurants[0].lng);
+          const routeLine = new kakao.maps.Polyline({
+            path: [officePosition, destination],
+            strokeWeight: 4,
+            strokeColor: "#1bc5d8",
+            strokeOpacity: 0.9,
+            strokeStyle: "shortdash",
+          });
+          routeLine.setMap(map);
+          map.setBounds(bounds, 60, 60, 60, 60);
+        } else if (restaurants.length > 0) {
+          map.setBounds(bounds);
+        }
 
         setStatus("ready");
       })
@@ -92,7 +115,8 @@ export default function KakaoMap({ restaurants = [] }) {
     return () => {
       isMounted = false;
     };
-  }, [restaurants]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restaurants, showRoute]);
 
   if (status === "error") {
     return (
