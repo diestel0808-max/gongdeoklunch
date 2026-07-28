@@ -2,39 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { OFFICE } from "@/lib/constants";
+import { loadKakaoMapScript } from "@/lib/kakaoLoader";
 
-// 카카오맵 SDK 스크립트를 한 번만 불러오기 위한 헬퍼
-function loadKakaoMapScript(appKey) {
-  return new Promise((resolve, reject) => {
-    // 이미 로드되어 있으면 다시 불러오지 않음
-    if (window.kakao && window.kakao.maps) {
-      resolve(window.kakao);
-      return;
-    }
-
-    const existingScript = document.getElementById("kakao-map-sdk");
-    if (existingScript) {
-      existingScript.addEventListener("load", () => {
-        window.kakao.maps.load(() => resolve(window.kakao));
-      });
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.id = "kakao-map-sdk";
-    script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${appKey}&autoload=false`;
-    script.async = true;
-    script.onload = () => {
-      window.kakao.maps.load(() => resolve(window.kakao));
-    };
-    script.onerror = reject;
-    document.head.appendChild(script);
-  });
-}
-
-export default function KakaoMap({ restaurants = [] }) {
+// restaurants: 지도에 표시할 식당 목록
+// onMarkerClick: 식당 마커를 클릭했을 때 호출 (식당 객체를 인자로 받음)
+export default function KakaoMap({ restaurants = [], onMarkerClick }) {
   const mapContainerRef = useRef(null);
-  const [status, setStatus] = useState("loading"); // loading | ready | error
+  const [status, setStatus] = useState("loading");
 
   useEffect(() => {
     const appKey = process.env.NEXT_PUBLIC_KAKAO_JS_KEY;
@@ -50,38 +24,61 @@ export default function KakaoMap({ restaurants = [] }) {
       .then((kakao) => {
         if (!isMounted || !mapContainerRef.current) return;
 
-        const center = new kakao.maps.LatLng(OFFICE.lat, OFFICE.lng);
+        const officePosition = new kakao.maps.LatLng(OFFICE.lat, OFFICE.lng);
         const map = new kakao.maps.Map(mapContainerRef.current, {
-          center,
-          level: 4, // 숫자가 작을수록 확대
+          center: officePosition,
+          level: 4,
         });
 
-        // 회사 위치 마커 (강조 표시)
+        // 회사 위치는 일반 식당 마커보다 훨씬 크고 눈에 띄는 커스텀 핀으로 표시
+        const officeMarkerSvg = `
+          <svg xmlns="http://www.w3.org/2000/svg" width="46" height="58" viewBox="0 0 46 58">
+            <path d="M23 0C10.3 0 0 10.3 0 23c0 17.3 23 35 23 35s23-17.7 23-35C46 10.3 35.7 0 23 0z" fill="#1b2a34"/>
+            <circle cx="23" cy="23" r="15" fill="#1bc5d8"/>
+            <text x="23" y="29" font-size="16" text-anchor="middle" fill="#ffffff">🏢</text>
+          </svg>`;
+        const officeMarkerImage = new kakao.maps.MarkerImage(
+          `data:image/svg+xml;charset=utf-8,${encodeURIComponent(officeMarkerSvg)}`,
+          new kakao.maps.Size(46, 58),
+          { offset: new kakao.maps.Point(23, 58) }
+        );
         const officeMarker = new kakao.maps.Marker({
-          position: center,
+          position: officePosition,
           map,
+          image: officeMarkerImage,
+          zIndex: 10,
         });
         const officeInfo = new kakao.maps.InfoWindow({
-          content: `<div style="padding:6px 10px;font-size:12px;">🏢 ${OFFICE.name}</div>`,
+          content: `<div style="padding:6px 10px;font-size:12px;font-weight:700;">🏢 ${OFFICE.name}</div>`,
         });
         officeInfo.open(map, officeMarker);
 
-        // 식당 마커들
+        // 지도 범위를 자동으로 맞추기 위한 bounds
+        const bounds = new kakao.maps.LatLngBounds();
+        bounds.extend(officePosition);
+
         restaurants.forEach((restaurant) => {
           const position = new kakao.maps.LatLng(restaurant.lat, restaurant.lng);
+          bounds.extend(position);
+
           const marker = new kakao.maps.Marker({ position, map });
 
           const infoWindow = new kakao.maps.InfoWindow({
             content: `<div style="padding:6px 10px;font-size:12px;">${restaurant.name}</div>`,
           });
 
-          kakao.maps.event.addListener(marker, "mouseover", () => {
-            infoWindow.open(map, marker);
-          });
-          kakao.maps.event.addListener(marker, "mouseout", () => {
-            infoWindow.close();
-          });
+          kakao.maps.event.addListener(marker, "mouseover", () => infoWindow.open(map, marker));
+          kakao.maps.event.addListener(marker, "mouseout", () => infoWindow.close());
+
+          // 마커를 클릭하면 상세 정보로 이동할 수 있도록 콜백 연결
+          if (onMarkerClick) {
+            kakao.maps.event.addListener(marker, "click", () => onMarkerClick(restaurant));
+          }
         });
+
+        if (restaurants.length > 0) {
+          map.setBounds(bounds, 40, 40, 40, 40);
+        }
 
         setStatus("ready");
       })
@@ -92,6 +89,7 @@ export default function KakaoMap({ restaurants = [] }) {
     return () => {
       isMounted = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [restaurants]);
 
   if (status === "error") {
