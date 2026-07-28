@@ -4,25 +4,33 @@ import { useEffect, useRef, useState } from "react";
 import { OFFICE } from "@/lib/constants";
 import { loadKakaoMapScript } from "@/lib/kakaoLoader";
 
-// 거리 비율(0=가까움, 1=멂)에 따라 아주 살짝 크기가 다른 작은 점 마커 이미지를 만듦
-// (예전엔 가까울수록 크게 키웠는데, 지도 위에서 너무 두드러져 지저분해 보여서
-// 이제는 전체적으로 작은 점 형태로 줄이고 차이도 미세하게만 둠)
+// 회사 마커와 같은 눈물방울(핀) 모양으로, 크기만 훨씬 작게 만듦
+// (예전엔 그냥 원형 점이었는데, 회사 마커와 통일감 있게 핀 모양으로 변경)
 //
-// 화면에 보이는 점은 작지만, 탭(클릭) 가능한 영역은 그보다 넓게 잡아서
+// 화면에 보이는 핀은 작지만, 탭(클릭) 가능한 영역은 그보다 넓게 잡아서
 // 모바일에서도 손가락으로 정확히 누르기 쉽도록 투명한 여백을 둘레에 둡니다.
 function buildRestaurantMarkerImage(kakao, visibleSizePx) {
-  const canvasSize = visibleSizePx + 20; // 실제 터치 가능 영역 (투명 여백 포함)
-  const center = canvasSize / 2;
-  const radius = visibleSizePx / 2 - 1;
+  const w = visibleSizePx;
+  const h = Math.round(visibleSizePx * 1.25);
+  const canvasW = w + 14;
+  const canvasH = h + 14;
+  const offsetX = canvasW / 2;
+  const offsetY = canvasH - 7;
+
+  // 46x58 기준 핀 path를 원하는 크기(w,h)에 맞게 스케일링
+  const scaleX = w / 46;
+  const scaleY = h / 58;
 
   const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="${canvasSize}" height="${canvasSize}" viewBox="0 0 ${canvasSize} ${canvasSize}">
-      <circle cx="${center}" cy="${center}" r="${radius}" fill="#1bc5d8" stroke="#ffffff" stroke-width="1"/>
+    <svg xmlns="http://www.w3.org/2000/svg" width="${canvasW}" height="${canvasH}" viewBox="0 0 ${canvasW} ${canvasH}">
+      <g transform="translate(7,7) scale(${scaleX},${scaleY})">
+        <path d="M23 0C10.3 0 0 10.3 0 23c0 17.3 23 35 23 35s23-17.7 23-35C46 10.3 35.7 0 23 0z" fill="#1bc5d8" stroke="#ffffff" stroke-width="1.5"/>
+      </g>
     </svg>`;
   return new kakao.maps.MarkerImage(
     `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`,
-    new kakao.maps.Size(canvasSize, canvasSize),
-    { offset: new kakao.maps.Point(center, center) }
+    new kakao.maps.Size(canvasW, canvasH),
+    { offset: new kakao.maps.Point(offsetX, offsetY) }
   );
 }
 

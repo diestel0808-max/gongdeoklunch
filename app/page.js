@@ -287,6 +287,15 @@ export default function HomePage() {
   const [detailTarget, setDetailTarget] = useState(null);
   const [showLunchPicker, setShowLunchPicker] = useState(false);
   const [showAddRestaurant, setShowAddRestaurant] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  useEffect(() => {
+    const mql = window.matchMedia("(min-width: 768px)");
+    setIsDesktop(mql.matches);
+    const handler = (e) => setIsDesktop(e.matches);
+    mql.addEventListener("change", handler);
+    return () => mql.removeEventListener("change", handler);
+  }, []);
 
   const restaurants = useMemo(() => {
     // 카카오 API 로딩이 끝나기 전에 사용자 등록 식당만 먼저 뜨면 어색해 보이므로,
@@ -466,6 +475,14 @@ export default function HomePage() {
         </div>
 
         <div className="list-pane">
+        {isDesktop && detailTarget ? (
+          <RestaurantDetailPanel
+            restaurant={detailTarget}
+            onClose={() => setDetailTarget(null)}
+            inline
+          />
+        ) : (
+        <>
         <div style={{ padding: "10px 16px 0" }}>
         <input
           value={searchQuery}
@@ -670,6 +687,8 @@ export default function HomePage() {
           />
         ))}
       </div>
+        </>
+        )}
         </div>
       </div>
 
@@ -684,7 +703,7 @@ export default function HomePage() {
         />
       )}
 
-      {detailTarget && (
+      {!isDesktop && detailTarget && (
         <RestaurantDetailPanel restaurant={detailTarget} onClose={() => setDetailTarget(null)} />
       )}
 

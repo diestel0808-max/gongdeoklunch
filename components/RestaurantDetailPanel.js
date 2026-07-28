@@ -16,7 +16,7 @@ function joinValues(value) {
   return Array.isArray(value) ? value.join(", ") : value;
 }
 
-export default function RestaurantDetailPanel({ restaurant, onClose }) {
+export default function RestaurantDetailPanel({ restaurant, onClose, inline = false }) {
   const [reviews, setReviews] = useState([]);
   const [summary, setSummary] = useState(null);
   const [showReviewModal, setShowReviewModal] = useState(false);
@@ -47,29 +47,34 @@ export default function RestaurantDetailPanel({ restaurant, onClose }) {
     refreshReviews();
   };
 
-  return (
-    <div
-      style={{
+  const outerStyle = inline
+    ? { width: "100%", height: "100%", overflowY: "auto", background: "#fff" }
+    : {
         position: "fixed",
         inset: 0,
         background: "rgba(27,42,52,0.5)",
         display: "flex",
         justifyContent: "flex-end",
         zIndex: 40,
-      }}
-      onClick={onClose}
-    >
+      };
+
+  const innerStyle = inline
+    ? { background: "#fff", width: "100%" }
+    : {
+        background: "#fff",
+        width: "100%",
+        maxWidth: 480,
+        height: "100%",
+        overflowY: "auto",
+      };
+
+  return (
+    <div style={outerStyle} onClick={inline ? undefined : onClose}>
       <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: "#fff",
-          width: "100%",
-          maxWidth: 480,
-          height: "100%",
-          overflowY: "auto",
-        }}
+        onClick={inline ? undefined : (e) => e.stopPropagation()}
+        style={innerStyle}
       >
-        {/* 상단 닫기 바 */}
+        {/* 상단 바: PC 인라인 모드는 "목록으로" 링크, 모바일 오버레이는 닫기(X) */}
         <div
           style={{
             position: "sticky",
@@ -77,17 +82,33 @@ export default function RestaurantDetailPanel({ restaurant, onClose }) {
             background: "#fff",
             zIndex: 1,
             display: "flex",
-            justifyContent: "flex-end",
+            justifyContent: inline ? "flex-start" : "flex-end",
             padding: "10px 14px",
             borderBottom: "1px solid var(--color-gray-300)",
           }}
         >
-          <button
-            onClick={onClose}
-            style={{ border: "none", background: "transparent", fontSize: 20, cursor: "pointer" }}
-          >
-            ✕
-          </button>
+          {inline ? (
+            <button
+              onClick={onClose}
+              style={{
+                border: "none",
+                background: "transparent",
+                fontSize: 13,
+                fontWeight: 700,
+                color: "var(--color-navy)",
+                cursor: "pointer",
+              }}
+            >
+              ← 목록으로
+            </button>
+          ) : (
+            <button
+              onClick={onClose}
+              style={{ border: "none", background: "transparent", fontSize: 20, cursor: "pointer" }}
+            >
+              ✕
+            </button>
+          )}
         </div>
 
         {/* 지도 */}
