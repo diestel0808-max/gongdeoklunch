@@ -2,11 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import KakaoMap from "@/components/KakaoMap";
+import LunchPickerModal from "@/components/LunchPickerModal";
 import ReviewModal from "@/components/ReviewModal";
 import RestaurantDetailPanel from "@/components/RestaurantDetailPanel";
-import { CATEGORIES, OFFICE } from "@/lib/constants";
+import { CATEGORIES, COMPANION_TAGS, DISTANCE_FILTER_OPTIONS, OFFICE, PRICE_RANGE_OPTIONS, WAITING_LEVELS } from "@/lib/constants";
 import {
   getReviewsForRestaurant,
+  getRestaurantFilterData,
   hasLikedReview,
   summarizeReviews,
   toggleLikeReview,
@@ -15,6 +17,20 @@ import { cacheRestaurants } from "@/lib/restaurantCache";
 
 function joinValues(value) {
   return Array.isArray(value) ? value.join(", ") : value;
+}
+
+// 필터가 "전체"가 아니라 실제로 적용중일 때 눈에 띄게 강조
+function filterSelectStyle(isActive) {
+  return {
+    fontSize: 12,
+    padding: "6px 8px",
+    borderRadius: 8,
+    border: isActive ? "1px solid var(--color-teal)" : "1px solid var(--color-gray-300)",
+    background: isActive ? "var(--color-teal-light)" : "#fff",
+    color: isActive ? "var(--color-navy)" : "#555",
+    fontWeight: isActive ? 700 : 400,
+    cursor: "pointer",
+  };
 }
 
 function RestaurantCard({ restaurant, onWriteReview, onOpenDetail }) {
@@ -204,11 +220,16 @@ function RestaurantCard({ restaurant, onWriteReview, onOpenDetail }) {
 export default function HomePage() {
   const [activeCategory, setActiveCategory] = useState("전체");
   const [searchQuery, setSearchQuery] = useState("");
+  const [distanceFilter, setDistanceFilter] = useState("전체");
+  const [priceFilter, setPriceFilter] = useState("전체");
+  const [companionFilter, setCompanionFilter] = useState("전체");
+  const [waitingFilter, setWaitingFilter] = useState("전체");
   const [restaurants, setRestaurants] = useState([]);
   const [status, setStatus] = useState("loading"); // loading | ready | error
   const [errorMessage, setErrorMessage] = useState("");
   const [reviewTarget, setReviewTarget] = useState(null);
   const [detailTarget, setDetailTarget] = useState(null);
+  const [showLunchPicker, setShowLunchPicker] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -249,8 +270,25 @@ export default function HomePage() {
       list = list.filter((r) => r.name.includes(query));
     }
 
+    // 거리 필터 - 도보 시간 기준 (카카오 API 좌표로 항상 계산되는 값이라 후기 없이도 동작)
+    const distanceOption = DISTANCE_FILTER_OPTIONS.find((o) => o.label === distanceFilter);
+    if (distanceOption?.maxWalkMinutes) {
+      list = list.filter((r) => r.walkMinutes <= distanceOption.maxWalkMinutes);
+    }
+
+    // 가격대 / 추천 동행 / 웨이팅 필터 - 후기 데이터 기준이라, 후기가 없는 곳은 이 필터들에서 제외됨
+    if (priceFilter !== "전체" || companionFilter !== "전체" || waitingFilter !== "전체") {
+      list = list.filter((r) => {
+        const { waitingSet, companionSet, priceRangeSet } = getRestaurantFilterData(r.id);
+        if (priceFilter !== "전체" && !priceRangeSet.has(priceFilter)) return false;
+        if (companionFilter !== "전체" && !companionSet.has(companionFilter)) return false;
+        if (waitingFilter !== "전체" && !waitingSet.has(waitingFilter)) return false;
+        return true;
+      });
+    }
+
     return list;
-  }, [restaurants, activeCategory, searchQuery]);
+  }, [restaurants, activeCategory, searchQuery, distanceFilter, priceFilter, companionFilter, waitingFilter]);
 
   return (
     <main style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
@@ -267,20 +305,39 @@ export default function HomePage() {
           <h1 style={{ fontSize: 16, fontWeight: 700 }}>공덕 점심 뭐먹지?</h1>
           <p style={{ fontSize: 12, color: "#7a8288" }}>{OFFICE.name} 기준</p>
         </div>
-        <button
-          style={{
-            fontSize: 12,
-            padding: "8px 12px",
-            borderRadius: 8,
-            border: "none",
-            background: "var(--color-teal)",
-            color: "#fff",
-            fontWeight: 600,
-            cursor: "pointer",
-          }}
-        >
-          + 식당 등록
-        </button>
+        <div style={{ display: "flex", gap: 6 }}>
+          <button
+            onClick={() => setShowLunchPicker(true)}
+            style={{
+              fontSize: 12,
+              padding: "8px 12px",
+              borderRadius: 8,
+              border: "none",
+              background: "var(--color-navy)",
+              color: "#fff",
+              fontWeight: 700,
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+            }}
+          >
+            🍽 오늘 점심 뭐 먹지?
+          </button>
+          <button
+            style={{
+              fontSize: 12,
+              padding: "8px 12px",
+              borderRadius: 8,
+              border: "none",
+              background: "var(--color-teal)",
+              color: "#fff",
+              fontWeight: 600,
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+            }}
+          >
+            + 식당 등록
+          </button>
+        </div>
       </header>
 
       <div style={{ height: "40vh", minHeight: 220 }}>
@@ -338,12 +395,91 @@ export default function HomePage() {
         })}
       </div>
 
-      <div style={{ display: "flex", gap: 8, padding: "8px 16px", fontSize: 12, color: "#7a8288" }}>
-        <span>거리 ▾</span>
-        <span>가격 ▾</span>
-        <span>인원 ▾</span>
-        <span>웨이팅 ▾</span>
+      <div
+        style={{
+          display: "flex",
+          gap: 8,
+          padding: "8px 16px",
+          flexWrap: "wrap",
+        }}
+      >
+        <select
+          value={distanceFilter}
+          onChange={(e) => setDistanceFilter(e.target.value)}
+          style={filterSelectStyle(distanceFilter !== "전체")}
+        >
+          {DISTANCE_FILTER_OPTIONS.map((o) => (
+            <option key={o.label} value={o.label}>
+              거리: {o.label}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={priceFilter}
+          onChange={(e) => setPriceFilter(e.target.value)}
+          style={filterSelectStyle(priceFilter !== "전체")}
+        >
+          <option value="전체">가격: 전체</option>
+          {PRICE_RANGE_OPTIONS.map((o) => (
+            <option key={o} value={o}>
+              가격: {o}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={companionFilter}
+          onChange={(e) => setCompanionFilter(e.target.value)}
+          style={filterSelectStyle(companionFilter !== "전체")}
+        >
+          <option value="전체">인원: 전체</option>
+          {COMPANION_TAGS.map((o) => (
+            <option key={o} value={o}>
+              인원: {o}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={waitingFilter}
+          onChange={(e) => setWaitingFilter(e.target.value)}
+          style={filterSelectStyle(waitingFilter !== "전체")}
+        >
+          <option value="전체">웨이팅: 전체</option>
+          {WAITING_LEVELS.map((o) => (
+            <option key={o} value={o}>
+              웨이팅: {o}
+            </option>
+          ))}
+        </select>
+
+        {(priceFilter !== "전체" || companionFilter !== "전체" || waitingFilter !== "전체") && (
+          <button
+            onClick={() => {
+              setPriceFilter("전체");
+              setCompanionFilter("전체");
+              setWaitingFilter("전체");
+            }}
+            style={{
+              fontSize: 12,
+              color: "#999",
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              textDecoration: "underline",
+            }}
+          >
+            필터 초기화
+          </button>
+        )}
       </div>
+
+      {(priceFilter !== "전체" || companionFilter !== "전체" || waitingFilter !== "전체") && (
+        <p style={{ fontSize: 11, color: "#999", padding: "0 16px 8px" }}>
+          가격/인원/웨이팅 필터는 후기가 등록된 식당에서만 적용돼요.
+        </p>
+      )}
 
       <div style={{ flex: 1, overflowY: "auto", padding: "8px 16px 24px" }}>
         {status === "loading" && (
@@ -362,7 +498,7 @@ export default function HomePage() {
           <p style={{ fontSize: 13, color: "#999", padding: "24px 0" }}>
             {searchQuery
               ? `"${searchQuery}"에 해당하는 식당을 찾을 수 없어요.`
-              : "해당 카테고리에 등록된 식당이 아직 없어요."}
+              : "선택한 필터 조건에 맞는 식당이 없어요. (가격/인원/웨이팅 필터는 후기가 달린 곳만 대상이에요)"}
           </p>
         )}
 
@@ -389,6 +525,17 @@ export default function HomePage() {
 
       {detailTarget && (
         <RestaurantDetailPanel restaurant={detailTarget} onClose={() => setDetailTarget(null)} />
+      )}
+
+      {showLunchPicker && (
+        <LunchPickerModal
+          restaurants={restaurants}
+          onClose={() => setShowLunchPicker(false)}
+          onOpenDetail={(restaurant) => {
+            setShowLunchPicker(false);
+            setDetailTarget(restaurant);
+          }}
+        />
       )}
     </main>
   );

@@ -57,20 +57,27 @@ async function searchKakaoCategory({ groupCode, apiKey, page, centerLat, centerL
 }
 
 // 한 중심점에서 최대 3페이지(45개, 카카오 API 상한)까지 가져오기
+// 이 지점 하나가 실패해도(네트워크 오류 등) 전체 응답이 죽지 않도록,
+// 실패 시 빈 배열을 반환하고 넘어갑니다.
 async function fetchAllPagesForPoint({ groupCode, apiKey, centerLat, centerLng, radius }) {
   const allDocuments = [];
 
-  for (let page = 1; page <= 3; page += 1) {
-    const data = await searchKakaoCategory({
-      groupCode,
-      apiKey,
-      page,
-      centerLat,
-      centerLng,
-      radius,
-    });
-    allDocuments.push(...(data.documents || []));
-    if (data.meta?.is_end) break;
+  try {
+    for (let page = 1; page <= 3; page += 1) {
+      const data = await searchKakaoCategory({
+        groupCode,
+        apiKey,
+        page,
+        centerLat,
+        centerLng,
+        radius,
+      });
+      allDocuments.push(...(data.documents || []));
+      if (data.meta?.is_end) break;
+    }
+  } catch (error) {
+    console.error("격자 지점 검색 실패(건너뜀):", error.message);
+    return [];
   }
 
   return allDocuments;
@@ -97,18 +104,21 @@ async function fetchAllPagesForPoint({ groupCode, apiKey, centerLat, centerLng, 
 // ---------------------------------------------------------------
 // 카카오 로컬 API는 한 번의 검색(중심점+반경)당 최대 45개까지만 돌려줍니다.
 // 반경 안에 식당이 45개보다 많으면 뒤에 있는 곳들이 통째로 누락돼요.
-// 그래서 큰 반경 하나로 검색하는 대신, 반경을 3x3 격자(9개 지점)로
-// 잘게 나눠서 각각 검색한 뒤 결과를 합치는 방식으로 보완합니다.
+// 특히 공덕역 인근처럼 상권이 밀집된 곳은 900m~1.5km 반경 안에도 식당이
+// 45개를 훌쩍 넘을 수 있어서, 격자를 더 촘촘하게(5x5=25개 지점) 나눠
+// 각 지점이 담당하는 구역을 좁혀 45개 상한에 덜 걸리도록 합니다.
 //
 // 격자 간격(spacing)과 각 지점의 검색 반경(subRadius)은 SEARCH_RADIUS_METERS에
-// 비례해서 자동으로 계산됩니다. (spacing = 전체반경의 절반, subRadius = spacing에
-// 여유분을 더한 값) 이렇게 하면 나중에 SEARCH_RADIUS_METERS를 늘리거나 줄여도
-// 사각지대 없이 커버 범위가 같이 늘어나거나 줄어듭니다.
+// 비례해서 자동 계산됩니다. 5개 지점이 -radius~+radius를 균등하게 나눠 잡고,
+// 각 지점의 반경은 격자 대각선 절반(spacing/√2)보다 여유있게 잡아 사각지대를 없앱니다.
 // ---------------------------------------------------------------
 function buildSearchGridPoints() {
-  const spacing = SEARCH_RADIUS_METERS / 2;
-  const subRadius = Math.round(spacing * 1.2); // 정동/정서/정남/정북 방향까지 확실히 덮도록 여유분 20%
-  const offsetsMeters = [-spacing, 0, spacing];
+  const GRID_SIZE = 5;
+  const radius = SEARCH_RADIUS_METERS;
+  const spacing = (2 * radius) / (GRID_SIZE - 1);
+  const subRadius = Math.round((spacing / Math.SQRT2) * 1.15); // 대각선 사각지대까지 여유있게 커버
+
+  const offsetsMeters = Array.from({ length: GRID_SIZE }, (_, i) => -radius + i * spacing);
 
   const points = [];
   offsetsMeters.forEach((offsetLat) => {
