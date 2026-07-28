@@ -90,8 +90,8 @@ export default function ReviewModal({ restaurant, onClose, onSubmitted }) {
   };
 
   const handleConfirmProfile = () => {
-    if (!nicknameInput.trim() || pinInput.trim().length !== 4) {
-      setErrorMessage("닉네임과 4자리 PIN을 입력해주세요.");
+    if (!nicknameInput.trim() || pinInput.trim().length !== 6) {
+      setErrorMessage("닉네임과 6자리 PIN을 입력해주세요.");
       return;
     }
     const newProfile = { nickname: nicknameInput.trim(), pin: pinInput.trim() };
@@ -231,9 +231,9 @@ export default function ReviewModal({ restaurant, onClose, onSubmitted }) {
                 }}
               />
               <input
-                placeholder="PIN 4자리"
+                placeholder="PIN 6자리"
                 value={pinInput}
-                maxLength={4}
+                maxLength={6}
                 inputMode="numeric"
                 onChange={(e) => setPinInput(e.target.value.replace(/[^0-9]/g, ""))}
                 style={{
@@ -263,6 +263,9 @@ export default function ReviewModal({ restaurant, onClose, onSubmitted }) {
             <p style={{ fontSize: 11, color: "#999", marginTop: 6 }}>
               한 번 정하면 이 브라우저에서 계속 이 닉네임으로 후기가 남겨져요. (매번 다시 입력할
               필요 없음)
+            </p>
+            <p style={{ fontSize: 11, color: "#d9822b", marginTop: 4, fontWeight: 600 }}>
+              ⚠️ 닉네임은 한 번 정하면 이후 수정이 어려워요. 신중하게 정해주세요!
             </p>
           </div>
         )}
