@@ -1,16 +1,44 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import KakaoMap from "@/components/KakaoMap";
-import { CATEGORIES, DUMMY_RESTAURANTS, OFFICE } from "@/lib/constants";
+import { CATEGORIES, OFFICE } from "@/lib/constants";
 
 export default function HomePage() {
   const [activeCategory, setActiveCategory] = useState("전체");
+  const [restaurants, setRestaurants] = useState([]);
+  const [status, setStatus] = useState("loading"); // loading | ready | error
+  const [errorMessage, setErrorMessage] = useState("");
 
-  const filteredRestaurants =
-    activeCategory === "전체"
-      ? DUMMY_RESTAURANTS
-      : DUMMY_RESTAURANTS.filter((r) => r.category === activeCategory);
+  useEffect(() => {
+    let isMounted = true;
+
+    fetch("/api/restaurants")
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "식당 정보를 불러오지 못했습니다.");
+        return data;
+      })
+      .then((data) => {
+        if (!isMounted) return;
+        setRestaurants(data.restaurants || []);
+        setStatus("ready");
+      })
+      .catch((err) => {
+        if (!isMounted) return;
+        setErrorMessage(err.message);
+        setStatus("error");
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const filteredRestaurants = useMemo(() => {
+    if (activeCategory === "전체") return restaurants;
+    return restaurants.filter((r) => r.category === activeCategory);
+  }, [restaurants, activeCategory]);
 
   return (
     <main
@@ -50,7 +78,7 @@ export default function HomePage() {
         </button>
       </header>
 
-      {/* 지도 영역 - 화면의 절반 정도 */}
+      {/* 지도 영역 */}
       <div style={{ height: "45vh", minHeight: 240 }}>
         <KakaoMap restaurants={filteredRestaurants} />
       </div>
@@ -113,7 +141,19 @@ export default function HomePage() {
           padding: "8px 16px 24px",
         }}
       >
-        {filteredRestaurants.length === 0 && (
+        {status === "loading" && (
+          <p style={{ fontSize: 13, color: "#999", padding: "24px 0" }}>
+            공덕역 인근 식당 정보를 불러오는 중...
+          </p>
+        )}
+
+        {status === "error" && (
+          <p style={{ fontSize: 13, color: "#d33", padding: "24px 0" }}>
+            식당 정보를 불러오지 못했습니다: {errorMessage}
+          </p>
+        )}
+
+        {status === "ready" && filteredRestaurants.length === 0 && (
           <p style={{ fontSize: 13, color: "#999", padding: "24px 0" }}>
             해당 카테고리에 등록된 식당이 아직 없어요.
           </p>
@@ -150,6 +190,7 @@ export default function HomePage() {
                   background: "var(--color-teal-light)",
                   padding: "3px 8px",
                   borderRadius: 6,
+                  flexShrink: 0,
                 }}
               >
                 {restaurant.category}
@@ -163,10 +204,11 @@ export default function HomePage() {
                 marginTop: 10,
                 fontSize: 12,
                 color: "#555",
+                flexWrap: "wrap",
               }}
             >
+              <span>🚶 도보 {restaurant.walkMinutes}분 ({restaurant.distanceMeters}m)</span>
               <span>💰 {restaurant.priceRange}</span>
-              <span>👥 {restaurant.groupSize}</span>
               <span>⏱ 웨이팅 {restaurant.waiting}</span>
             </div>
 
