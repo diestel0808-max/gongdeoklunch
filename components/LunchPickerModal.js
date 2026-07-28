@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   CATEGORIES,
   COMPANION_TAGS,
@@ -99,6 +99,9 @@ function RestaurantResultCard({ result, totalConditions, onOpenDetail }) {
   );
 }
 
+// 슬롯머신처럼 점점 느려지며 멈추는 딜레이 간격(ms)
+const ROLL_DELAYS = [70, 70, 80, 90, 100, 120, 150, 190, 240, 300, 380];
+
 export default function LunchPickerModal({ restaurants, onClose, onOpenDetail }) {
   const [step, setStep] = useState("form"); // form | result
   const [categories, setCategories] = useState([]);
@@ -107,6 +110,12 @@ export default function LunchPickerModal({ restaurants, onClose, onOpenDetail })
   const [companions, setCompanions] = useState([]);
   const [waitings, setWaitings] = useState([]);
 
+  const [pickerState, setPickerState] = useState("idle"); // idle | rolling | picked
+  const [rollingName, setRollingName] = useState("");
+  const [pickedResult, setPickedResult] = useState(null);
+  const lastPickedIdRef = useRef(null);
+  const rollTimeoutRef = useRef(null);
+
   const distanceOptions = DISTANCE_FILTER_OPTIONS.filter((o) => o.maxWalkMinutes !== null);
   const categoryOptions = CATEGORIES.filter((c) => c !== "전체");
 
@@ -114,12 +123,6 @@ export default function LunchPickerModal({ restaurants, onClose, onOpenDetail })
     setList(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
   };
 
-  // ---------------------------------------------------------------
-  // 점수 기반 추천: 조건을 "다 맞아야만 통과"가 아니라, 5개 조건군(카테고리/거리/
-  // 가격/동행/웨이팅) 중 사용자가 실제로 선택한 것들을 기준으로 "몇 개나 맞는지"
-  // 점수를 매겨서 높은 순으로 정렬합니다. 후기가 부족해 일부 조건을 확인할 수
-  // 없는 곳도 완전히 배제되지 않고, 맞는 조건 개수만큼 순위에 반영돼요.
-  // ---------------------------------------------------------------
   const rankedResults = useMemo(() => {
     const maxWalkMinutes = distances.length
       ? Math.max(...distances.map((d) => distanceOptions.find((o) => o.label === d).maxWalkMinutes))
@@ -150,8 +153,8 @@ export default function LunchPickerModal({ restaurants, onClose, onOpenDetail })
 
     scored.sort((a, b) => {
       if (b.matchedCount !== a.matchedCount) return b.matchedCount - a.matchedCount;
-      if (b.reviewCount !== a.reviewCount) return b.reviewCount - a.reviewCount; // 후기 많은 곳 우선
-      return a.restaurant.walkMinutes - b.restaurant.walkMinutes; // 가까운 곳 우선
+      if (b.reviewCount !== a.reviewCount) return b.reviewCount - a.reviewCount;
+      return a.restaurant.walkMinutes - b.restaurant.walkMinutes;
     });
 
     return { scored, totalConditions: selectedGroups };
@@ -160,12 +163,42 @@ export default function LunchPickerModal({ restaurants, onClose, onOpenDetail })
   const topResults = rankedResults.scored.slice(0, 10);
   const hasAnyReviewCondition = prices.length > 0 || companions.length > 0 || waitings.length > 0;
 
-  const handleRandomPick = () => {
+  const startRoll = () => {
     if (rankedResults.scored.length === 0) return;
+
     const topScore = rankedResults.scored[0].matchedCount;
-    const topTier = rankedResults.scored.filter((r) => r.matchedCount === topScore).slice(0, 8);
-    const picked = topTier[Math.floor(Math.random() * topTier.length)];
-    onOpenDetail(picked.restaurant);
+    let pool = rankedResults.scored.filter((r) => r.matchedCount === topScore).slice(0, 8);
+    if (pool.length === 0) pool = rankedResults.scored.slice(0, 8);
+
+    let candidatePool =
+      pool.length > 1 ? pool.filter((r) => r.restaurant.id !== lastPickedIdRef.current) : pool;
+    if (candidatePool.length === 0) candidatePool = pool;
+
+    const finalPick = candidatePool[Math.floor(Math.random() * candidatePool.length)];
+
+    if (rollTimeoutRef.current) clearTimeout(rollTimeoutRef.current);
+    setPickerState("rolling");
+    setPickedResult(null);
+
+    const runStep = (idx) => {
+      const randomDuring = pool[Math.floor(Math.random() * pool.length)];
+      setRollingName(randomDuring.restaurant.name);
+
+      if (idx >= ROLL_DELAYS.length) {
+        lastPickedIdRef.current = finalPick.restaurant.id;
+        setPickedResult(finalPick);
+        setPickerState("picked");
+        return;
+      }
+      rollTimeoutRef.current = setTimeout(() => runStep(idx + 1), ROLL_DELAYS[idx]);
+    };
+
+    runStep(0);
+  };
+
+  const handleClosePicker = () => {
+    if (rollTimeoutRef.current) clearTimeout(rollTimeoutRef.current);
+    setPickerState("idle");
   };
 
   return (
@@ -193,6 +226,17 @@ export default function LunchPickerModal({ restaurants, onClose, onOpenDetail })
           padding: 20,
         }}
       >
+        <style>{`
+          @keyframes lunchpicker-pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.04); }
+          }
+          @keyframes lunchpicker-pop {
+            0% { transform: scale(0.85); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+          }
+        `}</style>
+
         <div
           style={{
             display: "flex",
@@ -209,145 +253,243 @@ export default function LunchPickerModal({ restaurants, onClose, onOpenDetail })
             ✕
           </button>
         </div>
-        <p style={{ fontSize: 12, color: "#999", marginBottom: 16 }}>
-          원하는 조건을 자유롭게 골라주세요. 조건에 가장 많이 맞는 곳부터 보여드려요.
-        </p>
 
-        {step === "form" && (
-          <>
-            <MultiChipGroup
-              label="카테고리"
-              options={categoryOptions}
-              values={categories}
-              onToggle={(v) => toggle(categories, setCategories, v)}
-            />
-            <MultiChipGroup
-              label="거리"
-              options={distanceOptions.map((o) => o.label)}
-              values={distances}
-              onToggle={(v) => toggle(distances, setDistances, v)}
-            />
-            <MultiChipGroup
-              label="가격대"
-              options={PRICE_RANGE_OPTIONS}
-              values={prices}
-              onToggle={(v) => toggle(prices, setPrices, v)}
-              hint="(후기 기반)"
-            />
-            <MultiChipGroup
-              label="추천 동행"
-              options={COMPANION_TAGS}
-              values={companions}
-              onToggle={(v) => toggle(companions, setCompanions, v)}
-              hint="(후기 기반)"
-            />
-            <MultiChipGroup
-              label="웨이팅"
-              options={WAITING_LEVELS}
-              values={waitings}
-              onToggle={(v) => toggle(waitings, setWaitings, v)}
-              hint="(후기 기반)"
-            />
-
+        {pickerState !== "idle" ? (
+          <div style={{ padding: "12px 0" }}>
             <button
-              onClick={() => setStep("result")}
+              onClick={handleClosePicker}
               style={{
-                width: "100%",
-                padding: "13px 0",
-                borderRadius: 8,
-                border: "none",
-                background: "var(--color-navy)",
-                color: "#fff",
-                fontWeight: 700,
-                fontSize: 14,
-                cursor: "pointer",
-                marginTop: 4,
-              }}
-            >
-              이 조건으로 추천받기
-            </button>
-
-            <button
-              onClick={handleRandomPick}
-              style={{
-                width: "100%",
-                padding: "12px 0",
-                borderRadius: 8,
-                border: "1px solid var(--color-gray-300)",
-                background: "#fff",
+                fontSize: 12,
                 color: "var(--color-navy)",
-                fontWeight: 700,
-                fontSize: 13,
+                background: "transparent",
+                border: "none",
                 cursor: "pointer",
-                marginTop: 8,
+                fontWeight: 600,
+                marginBottom: 16,
               }}
             >
-              🎲 그냥 아무거나 골라줘 (랜덤 추천)
+              ← 목록으로 돌아가기
             </button>
-          </>
-        )}
 
-        {step === "result" && (
-          <>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
-              <button
-                onClick={() => setStep("form")}
-                style={{
-                  fontSize: 12,
-                  color: "var(--color-navy)",
-                  background: "transparent",
-                  border: "none",
-                  cursor: "pointer",
-                  fontWeight: 600,
-                }}
-              >
-                ← 조건 다시 고르기
-              </button>
-              <button
-                onClick={handleRandomPick}
-                style={{
-                  fontSize: 12,
-                  color: "var(--color-navy)",
-                  background: "var(--color-teal-light)",
-                  border: "none",
-                  borderRadius: 6,
-                  padding: "4px 10px",
-                  cursor: "pointer",
-                  fontWeight: 700,
-                }}
-              >
-                🎲 랜덤 뽑기
-              </button>
+            <div
+              style={{
+                border: "2px solid var(--color-teal)",
+                borderRadius: 16,
+                padding: "32px 16px",
+                textAlign: "center",
+                background: "var(--color-teal-light)",
+              }}
+            >
+              {pickerState === "rolling" && (
+                <>
+                  <p style={{ fontSize: 12, color: "#666", marginBottom: 12 }}>
+                    오늘의 점심을 뽑는 중...
+                  </p>
+                  <p
+                    style={{
+                      fontSize: 22,
+                      fontWeight: 800,
+                      color: "var(--color-navy)",
+                      animation: "lunchpicker-pulse 0.3s ease-in-out infinite",
+                    }}
+                  >
+                    🎲 {rollingName}
+                  </p>
+                </>
+              )}
+
+              {pickerState === "picked" && pickedResult && (
+                <div style={{ animation: "lunchpicker-pop 0.25s ease-out" }}>
+                  <p style={{ fontSize: 12, color: "#666", marginBottom: 8 }}>오늘의 점심은!</p>
+                  <p style={{ fontSize: 24, fontWeight: 800, color: "var(--color-navy)" }}>
+                    🎉 {pickedResult.restaurant.name}
+                  </p>
+                  <p style={{ fontSize: 13, color: "#555", marginTop: 8 }}>
+                    {pickedResult.restaurant.category} · 도보 {pickedResult.restaurant.walkMinutes}
+                    분 · {pickedResult.restaurant.address}
+                  </p>
+
+                  <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
+                    <button
+                      onClick={startRoll}
+                      style={{
+                        flex: 1,
+                        padding: "11px 0",
+                        borderRadius: 8,
+                        border: "1px solid var(--color-navy)",
+                        background: "#fff",
+                        color: "var(--color-navy)",
+                        fontWeight: 700,
+                        fontSize: 13,
+                        cursor: "pointer",
+                      }}
+                    >
+                      🔁 다시 뽑기
+                    </button>
+                    <button
+                      onClick={() => onOpenDetail(pickedResult.restaurant)}
+                      style={{
+                        flex: 1,
+                        padding: "11px 0",
+                        borderRadius: 8,
+                        border: "none",
+                        background: "var(--color-navy)",
+                        color: "#fff",
+                        fontWeight: 700,
+                        fontSize: 13,
+                        cursor: "pointer",
+                      }}
+                    >
+                      ✅ 이걸로 결정!
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
-
-            <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>
-              추천 후보 {topResults.length}곳
+          </div>
+        ) : (
+          <>
+            <p style={{ fontSize: 12, color: "#999", marginBottom: 16 }}>
+              원하는 조건을 자유롭게 골라주세요. 조건에 가장 많이 맞는 곳부터 보여드려요.
             </p>
-            {rankedResults.totalConditions > 0 && (
-              <p style={{ fontSize: 11, color: "#999", marginBottom: 4 }}>
-                조건을 가장 많이 만족하는 곳부터 순서대로 보여드려요.
-              </p>
-            )}
-            {hasAnyReviewCondition && (
-              <p style={{ fontSize: 11, color: "#999", marginBottom: 12 }}>
-                가격/인원/웨이팅 조건은 후기가 등록된 식당에서만 확인 가능해요.
-              </p>
+
+            {step === "form" && (
+              <>
+                <MultiChipGroup
+                  label="카테고리"
+                  options={categoryOptions}
+                  values={categories}
+                  onToggle={(v) => toggle(categories, setCategories, v)}
+                />
+                <MultiChipGroup
+                  label="거리"
+                  options={distanceOptions.map((o) => o.label)}
+                  values={distances}
+                  onToggle={(v) => toggle(distances, setDistances, v)}
+                />
+                <MultiChipGroup
+                  label="가격대"
+                  options={PRICE_RANGE_OPTIONS}
+                  values={prices}
+                  onToggle={(v) => toggle(prices, setPrices, v)}
+                  hint="(후기 기반)"
+                />
+                <MultiChipGroup
+                  label="추천 동행"
+                  options={COMPANION_TAGS}
+                  values={companions}
+                  onToggle={(v) => toggle(companions, setCompanions, v)}
+                  hint="(후기 기반)"
+                />
+                <MultiChipGroup
+                  label="웨이팅"
+                  options={WAITING_LEVELS}
+                  values={waitings}
+                  onToggle={(v) => toggle(waitings, setWaitings, v)}
+                  hint="(후기 기반)"
+                />
+
+                <button
+                  onClick={() => setStep("result")}
+                  style={{
+                    width: "100%",
+                    padding: "13px 0",
+                    borderRadius: 8,
+                    border: "none",
+                    background: "var(--color-navy)",
+                    color: "#fff",
+                    fontWeight: 700,
+                    fontSize: 14,
+                    cursor: "pointer",
+                    marginTop: 4,
+                  }}
+                >
+                  이 조건으로 추천받기
+                </button>
+
+                <button
+                  onClick={startRoll}
+                  style={{
+                    width: "100%",
+                    padding: "12px 0",
+                    borderRadius: 8,
+                    border: "1px solid var(--color-gray-300)",
+                    background: "#fff",
+                    color: "var(--color-navy)",
+                    fontWeight: 700,
+                    fontSize: 13,
+                    cursor: "pointer",
+                    marginTop: 8,
+                  }}
+                >
+                  🎲 그냥 아무거나 골라줘 (랜덤 추천)
+                </button>
+              </>
             )}
 
-            {topResults.length === 0 && (
-              <p style={{ fontSize: 13, color: "#999", padding: "24px 0" }}>
-                추천할 식당이 없어요. 조건을 조금 줄여서 다시 시도해보세요.
-              </p>
-            )}
+            {step === "result" && (
+              <>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
+                  <button
+                    onClick={() => setStep("form")}
+                    style={{
+                      fontSize: 12,
+                      color: "var(--color-navy)",
+                      background: "transparent",
+                      border: "none",
+                      cursor: "pointer",
+                      fontWeight: 600,
+                    }}
+                  >
+                    ← 조건 다시 고르기
+                  </button>
+                  <button
+                    onClick={startRoll}
+                    style={{
+                      fontSize: 12,
+                      color: "var(--color-navy)",
+                      background: "var(--color-teal-light)",
+                      border: "none",
+                      borderRadius: 6,
+                      padding: "4px 10px",
+                      cursor: "pointer",
+                      fontWeight: 700,
+                    }}
+                  >
+                    🎲 랜덤 뽑기
+                  </button>
+                </div>
 
-            {topResults.map((result) => (
-              <RestaurantResultCard
-                key={result.restaurant.id}
-                result={result}
-                totalConditions={rankedResults.totalConditions}
-                onOpenDetail={onOpenDetail}
-              />
-            ))}
+                <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>
+                  추천 후보 {topResults.length}곳
+                </p>
+                {rankedResults.totalConditions > 0 && (
+                  <p style={{ fontSize: 11, color: "#999", marginBottom: 4 }}>
+                    조건을 가장 많이 만족하는 곳부터 순서대로 보여드려요.
+                  </p>
+                )}
+                {hasAnyReviewCondition && (
+                  <p style={{ fontSize: 11, color: "#999", marginBottom: 12 }}>
+                    가격/인원/웨이팅 조건은 후기가 등록된 식당에서만 확인 가능해요.
+                  </p>
+                )}
+
+                {topResults.length === 0 && (
+                  <p style={{ fontSize: 13, color: "#999", padding: "24px 0" }}>
+                    추천할 식당이 없어요. 조건을 조금 줄여서 다시 시도해보세요.
+                  </p>
+                )}
+
+                {topResults.map((result) => (
+                  <RestaurantResultCard
+                    key={result.restaurant.id}
+                    result={result}
+                    totalConditions={rankedResults.totalConditions}
+                    onOpenDetail={onOpenDetail}
+                  />
+                ))}
+              </>
+            )}
           </>
         )}
       </div>
