@@ -145,7 +145,7 @@ function interleaveByCategory(sortedList) {
 }
 
 export default function LunchPickerModal({ restaurants, onClose, onOpenDetail }) {
-  const [step, setStep] = useState("form"); // form | result
+  const [step, setStep] = useState("form"); // form | thinking | result
   const [categories, setCategories] = useState([]);
   const [distances, setDistances] = useState([]);
   const [prices, setPrices] = useState([]);
@@ -317,7 +317,10 @@ export default function LunchPickerModal({ restaurants, onClose, onOpenDetail })
             />
 
             <button
-              onClick={() => setStep("result")}
+              onClick={() => {
+                setStep("thinking");
+                setTimeout(() => setStep("result"), 1400);
+              }}
               style={{
                 width: "100%",
                 padding: "13px 0",
@@ -334,6 +337,31 @@ export default function LunchPickerModal({ restaurants, onClose, onOpenDetail })
               🤖 후기 분석해서 추천받기
             </button>
           </>
+        )}
+
+        {step === "thinking" && (
+          <div style={{ padding: "50px 0", textAlign: "center" }}>
+            <style>{`
+              @keyframes lunchpicker-thinking-bounce {
+                0%, 100% { transform: translateY(0); }
+                50% { transform: translateY(-8px); }
+              }
+            `}</style>
+            <p
+              style={{
+                fontSize: 40,
+                animation: "lunchpicker-thinking-bounce 0.6s ease-in-out infinite",
+              }}
+            >
+              🤔
+            </p>
+            <p style={{ fontSize: 14, fontWeight: 700, color: "var(--color-navy)", marginTop: 12 }}>
+              조금 고민하는 중...
+            </p>
+            <p style={{ fontSize: 12, color: "#999", marginTop: 6 }}>
+              동료들의 후기를 살펴보고 있어요
+            </p>
+          </div>
         )}
 
         {step === "result" && (
@@ -364,8 +392,7 @@ export default function LunchPickerModal({ restaurants, onClose, onOpenDetail })
                 fontWeight: 600,
               }}
             >
-              🤖 동료들의 후기 {topPrimary.reduce((sum, r) => sum + (r.reviewCount || 0), 0)}건을
-              분석해서 조건에 맞는 곳을 골라봤어요.
+              🤖 동료들의 후기를 분석해서 조건에 맞는 곳을 골라봤어요.
             </div>
 
             <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>
@@ -384,7 +411,7 @@ export default function LunchPickerModal({ restaurants, onClose, onOpenDetail })
                 restaurant={restaurant}
                 reasonText={
                   reviewCount > 0
-                    ? `📝 후기 ${reviewCount}건 참고 · 조건에 딱 맞아요`
+                    ? "📝 후기 참고 · 조건에 딱 맞아요"
                     : evaluated.totalConditions > 0
                     ? "✅ 조건에 딱 맞아요"
                     : null

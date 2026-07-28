@@ -15,6 +15,7 @@ import {
   summarizeReviews,
   toggleLikeReview,
 } from "@/lib/reviewStorage";
+import { getFavoriteCount, isFavorited, toggleFavorite } from "@/lib/favoriteStorage";
 import { cacheRestaurants } from "@/lib/restaurantCache";
 
 function joinValues(value) {
@@ -38,6 +39,8 @@ function filterSelectStyle(isActive) {
 function RestaurantCard({ restaurant, onWriteReview, onOpenDetail }) {
   const [reviews, setReviews] = useState([]);
   const [summary, setSummary] = useState(null);
+  const [favoriteCount, setFavoriteCount] = useState(0);
+  const [favorited, setFavorited] = useState(false);
 
   const refreshReviews = () => {
     const list = getReviewsForRestaurant(restaurant.id);
@@ -47,8 +50,16 @@ function RestaurantCard({ restaurant, onWriteReview, onOpenDetail }) {
 
   useEffect(() => {
     refreshReviews();
+    setFavoriteCount(getFavoriteCount(restaurant.id));
+    setFavorited(isFavorited(restaurant.id));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [restaurant.id]);
+
+  const handleToggleFavorite = () => {
+    const newCount = toggleFavorite(restaurant.id);
+    setFavoriteCount(newCount);
+    setFavorited(isFavorited(restaurant.id));
+  };
 
   const handleLike = (reviewId) => {
     toggleLikeReview(restaurant.id, reviewId);
@@ -69,19 +80,38 @@ function RestaurantCard({ restaurant, onWriteReview, onOpenDetail }) {
           <h2 style={{ fontSize: 15, fontWeight: 700 }}>{restaurant.name}</h2>
           <p style={{ fontSize: 12, color: "#7a8288", marginTop: 2 }}>{restaurant.address}</p>
         </div>
-        <span
-          style={{
-            fontSize: 11,
-            fontWeight: 700,
-            color: "var(--color-teal)",
-            background: "var(--color-teal-light)",
-            padding: "3px 8px",
-            borderRadius: 6,
-            flexShrink: 0,
-          }}
-        >
-          {restaurant.category}
-        </span>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              color: "var(--color-teal)",
+              background: "var(--color-teal-light)",
+              padding: "3px 8px",
+              borderRadius: 6,
+              flexShrink: 0,
+            }}
+          >
+            {restaurant.category}
+          </span>
+          <button
+            onClick={handleToggleFavorite}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+              fontSize: 12,
+              fontWeight: 700,
+              border: "none",
+              background: "transparent",
+              color: favorited ? "#e2662f" : "#aaa",
+              cursor: "pointer",
+              padding: 0,
+            }}
+          >
+            {favorited ? "❤️" : "🤍"} {favoriteCount}
+          </button>
+        </div>
       </div>
 
       {restaurant.source === "user" && (
@@ -246,6 +276,7 @@ export default function HomePage() {
   const [headcountFilter, setHeadcountFilter] = useState("전체");
   const [recommendedForFilter, setRecommendedForFilter] = useState("전체");
   const [waitingFilter, setWaitingFilter] = useState("전체");
+  const [sortOption, setSortOption] = useState("distance"); // distance | favorite | review
   const [apiRestaurants, setApiRestaurants] = useState([]);
   const [customRestaurants, setCustomRestaurants] = useState([]);
   const [status, setStatus] = useState("loading"); // loading | ready | error
@@ -347,6 +378,20 @@ export default function HomePage() {
     waitingFilter,
   ]);
 
+  const sortedRestaurants = useMemo(() => {
+    if (sortOption === "favorite") {
+      return [...filteredRestaurants].sort(
+        (a, b) => getFavoriteCount(b.id) - getFavoriteCount(a.id)
+      );
+    }
+    if (sortOption === "review") {
+      return [...filteredRestaurants].sort(
+        (a, b) => getRestaurantFilterData(b.id).reviewCount - getRestaurantFilterData(a.id).reviewCount
+      );
+    }
+    return filteredRestaurants; // 기본: 거리순 (restaurants가 이미 거리순으로 정렬돼있음)
+  }, [filteredRestaurants, sortOption]);
+
   return (
     <main style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
       <header
@@ -400,7 +445,8 @@ export default function HomePage() {
 
       <div style={{ height: "40vh", minHeight: 220 }}>
         <KakaoMap
-          restaurants={filteredRestaurants}
+          restaurants={sortedRestaurants}
+          highlightedId={detailTarget?.id}
           onMarkerClick={(restaurant) => setDetailTarget(restaurant)}
         />
       </div>
@@ -451,6 +497,26 @@ export default function HomePage() {
             </button>
           );
         })}
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "flex-end", padding: "8px 16px 0" }}>
+        <select
+          value={sortOption}
+          onChange={(e) => setSortOption(e.target.value)}
+          style={{
+            fontSize: 12,
+            padding: "6px 8px",
+            borderRadius: 8,
+            border: "1px solid var(--color-gray-300)",
+            background: "#fff",
+            color: "#555",
+            cursor: "pointer",
+          }}
+        >
+          <option value="distance">거리순</option>
+          <option value="favorite">인기순 (찜 많은 순)</option>
+          <option value="review">후기 많은 순</option>
+        </select>
       </div>
 
       <div
@@ -572,7 +638,7 @@ export default function HomePage() {
           </p>
         )}
 
-        {status === "ready" && filteredRestaurants.length === 0 && (
+        {status === "ready" && sortedRestaurants.length === 0 && (
           <p style={{ fontSize: 13, color: "#999", padding: "24px 0" }}>
             {searchQuery
               ? `"${searchQuery}"에 해당하는 식당을 찾을 수 없어요.`
@@ -580,7 +646,7 @@ export default function HomePage() {
           </p>
         )}
 
-        {filteredRestaurants.map((restaurant) => (
+        {sortedRestaurants.map((restaurant) => (
           <RestaurantCard
             key={restaurant.id}
             restaurant={restaurant}

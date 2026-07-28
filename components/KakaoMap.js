@@ -26,9 +26,25 @@ function buildRestaurantMarkerImage(kakao, visibleSizePx) {
   );
 }
 
+// 회사 마커와 크기는 비슷하지만 색이 다른, "선택된 식당" 강조용 핀 마커
+function buildHighlightMarkerImage(kakao) {
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="50" viewBox="0 0 40 50">
+      <path d="M20 0C9 0 0 9 0 20c0 15 20 30 20 30s20-15 20-30C40 9 31 0 20 0z" fill="#e2662f"/>
+      <circle cx="20" cy="20" r="12" fill="#ffffff"/>
+      <circle cx="20" cy="20" r="7" fill="#e2662f"/>
+    </svg>`;
+  return new kakao.maps.MarkerImage(
+    `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`,
+    new kakao.maps.Size(40, 50),
+    { offset: new kakao.maps.Point(20, 50) }
+  );
+}
+
 // restaurants: 지도에 표시할 식당 목록
 // onMarkerClick: 식당 마커를 클릭했을 때 호출 (식당 객체를 인자로 받음)
-export default function KakaoMap({ restaurants = [], onMarkerClick }) {
+// highlightedId: 이 id의 식당만 회사 마커급으로 크고 다른 색(주황)으로 강조 표시
+export default function KakaoMap({ restaurants = [], onMarkerClick, highlightedId }) {
   const mapContainerRef = useRef(null);
   const [status, setStatus] = useState("loading");
 
@@ -80,16 +96,22 @@ export default function KakaoMap({ restaurants = [], onMarkerClick }) {
         const MIN_SIZE = 10; // 가장 먼 식당 마커 크기
         const MAX_SIZE = 16; // 가장 가까운 식당 마커 크기 (클러스터 풀렸을 때도 잘 보이도록)
 
-        const restaurantMarkers = restaurants.map((restaurant) => {
+        const restaurantMarkers = [];
+        const clusterableMarkers = [];
+
+        restaurants.forEach((restaurant) => {
           const position = new kakao.maps.LatLng(restaurant.lat, restaurant.lng);
+          const isHighlighted = highlightedId && String(restaurant.id) === String(highlightedId);
 
           const ratio = Math.min((restaurant.distanceMeters || 0) / maxDistance, 1);
           const sizePx = Math.round(MAX_SIZE - (MAX_SIZE - MIN_SIZE) * ratio);
 
           const marker = new kakao.maps.Marker({
             position,
-            image: buildRestaurantMarkerImage(kakao, sizePx),
-            zIndex: Math.round(10 - ratio * 5), // 가까운 마커가 먼 마커 위에 그려지도록
+            image: isHighlighted
+              ? buildHighlightMarkerImage(kakao)
+              : buildRestaurantMarkerImage(kakao, sizePx),
+            zIndex: isHighlighted ? 9 : Math.round(10 - ratio * 5),
           });
 
           const infoWindow = new kakao.maps.InfoWindow({
@@ -103,13 +125,21 @@ export default function KakaoMap({ restaurants = [], onMarkerClick }) {
             kakao.maps.event.addListener(marker, "click", () => onMarkerClick(restaurant));
           }
 
-          return marker;
+          restaurantMarkers.push(marker);
+
+          if (isHighlighted) {
+            // 강조 마커는 클러스터에 묶이지 않고 항상 크고 눈에 띄게 별도로 표시
+            marker.setMap(map);
+            infoWindow.open(map, marker);
+          } else {
+            clusterableMarkers.push(marker);
+          }
         });
 
         // 식당이 여러 곳이고 밀집된 지역에서는 점들이 서로 겹쳐서 누르기 어려우므로,
         // 카카오 클러스터러로 가까운 마커들을 숫자 뭉치로 묶어서 보여줍니다.
         // 확대(줌인)하면 클러스터가 자동으로 풀리면서 개별 마커가 눌리기 쉬운 간격으로 흩어져요.
-        if (restaurantMarkers.length > 1) {
+        if (clusterableMarkers.length > 1) {
           const clusterer = new kakao.maps.MarkerClusterer({
             map,
             averageCenter: true,
@@ -140,9 +170,9 @@ export default function KakaoMap({ restaurants = [], onMarkerClick }) {
               },
             ],
           });
-          clusterer.addMarkers(restaurantMarkers);
+          clusterer.addMarkers(clusterableMarkers);
         } else {
-          restaurantMarkers.forEach((marker) => marker.setMap(map));
+          clusterableMarkers.forEach((marker) => marker.setMap(map));
         }
 
         // 식당이 1곳뿐인 경우(상세페이지)만 회사-식당 두 지점 기준으로 범위를 맞추고,
@@ -166,7 +196,7 @@ export default function KakaoMap({ restaurants = [], onMarkerClick }) {
       isMounted = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [restaurants]);
+  }, [restaurants, highlightedId]);
 
   if (status === "error") {
     return (

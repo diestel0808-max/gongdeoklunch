@@ -9,6 +9,7 @@ import {
   summarizeReviews,
   toggleLikeReview,
 } from "@/lib/reviewStorage";
+import { getFavoriteCount, isFavorited, toggleFavorite } from "@/lib/favoriteStorage";
 
 function joinValues(value) {
   return Array.isArray(value) ? value.join(", ") : value;
@@ -18,6 +19,8 @@ export default function RestaurantDetailPanel({ restaurant, onClose }) {
   const [reviews, setReviews] = useState([]);
   const [summary, setSummary] = useState(null);
   const [showReviewModal, setShowReviewModal] = useState(false);
+  const [favoriteCount, setFavoriteCount] = useState(0);
+  const [favorited, setFavorited] = useState(false);
 
   const refreshReviews = () => {
     const list = getReviewsForRestaurant(restaurant.id);
@@ -27,8 +30,16 @@ export default function RestaurantDetailPanel({ restaurant, onClose }) {
 
   useEffect(() => {
     refreshReviews();
+    setFavoriteCount(getFavoriteCount(restaurant.id));
+    setFavorited(isFavorited(restaurant.id));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [restaurant.id]);
+
+  const handleToggleFavorite = () => {
+    const newCount = toggleFavorite(restaurant.id);
+    setFavoriteCount(newCount);
+    setFavorited(isFavorited(restaurant.id));
+  };
 
   const handleLike = (reviewId) => {
     toggleLikeReview(restaurant.id, reviewId);
@@ -80,7 +91,7 @@ export default function RestaurantDetailPanel({ restaurant, onClose }) {
 
         {/* 지도 */}
         <div style={{ height: "32vh", minHeight: 180 }}>
-          <KakaoMap restaurants={[restaurant]} />
+          <KakaoMap restaurants={[restaurant]} highlightedId={restaurant.id} />
         </div>
 
         <div style={{ padding: 20 }}>
@@ -89,19 +100,38 @@ export default function RestaurantDetailPanel({ restaurant, onClose }) {
               <h1 style={{ fontSize: 19, fontWeight: 700 }}>{restaurant.name}</h1>
               <p style={{ fontSize: 13, color: "#7a8288", marginTop: 4 }}>{restaurant.address}</p>
             </div>
-            <span
-              style={{
-                fontSize: 12,
-                fontWeight: 700,
-                color: "var(--color-teal)",
-                background: "var(--color-teal-light)",
-                padding: "4px 10px",
-                borderRadius: 6,
-                flexShrink: 0,
-              }}
-            >
-              {restaurant.category}
-            </span>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
+              <span
+                style={{
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: "var(--color-teal)",
+                  background: "var(--color-teal-light)",
+                  padding: "4px 10px",
+                  borderRadius: 6,
+                  flexShrink: 0,
+                }}
+              >
+                {restaurant.category}
+              </span>
+              <button
+                onClick={handleToggleFavorite}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                  fontSize: 13,
+                  fontWeight: 700,
+                  border: "none",
+                  background: "transparent",
+                  color: favorited ? "#e2662f" : "#aaa",
+                  cursor: "pointer",
+                  padding: 0,
+                }}
+              >
+                {favorited ? "❤️" : "🤍"} {favoriteCount}
+              </button>
+            </div>
           </div>
 
           <div
