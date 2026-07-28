@@ -9,7 +9,7 @@ import {
   REVISIT_OPTIONS,
   WAITING_LEVELS,
 } from "@/lib/constants";
-import { addReview, clearProfile, getProfile, saveProfile, verifyOrCreateProfile } from "@/lib/reviewStorage";
+import { addReview, getProfile, saveProfile, verifyOrCreateProfile } from "@/lib/reviewStorage";
 
 const chipStyle = (isActive) => ({
   padding: "6px 12px",
@@ -116,14 +116,6 @@ export default function ReviewModal({ restaurant, onClose, onSubmitted }) {
     setIsEditingProfile(false);
   };
 
-  const handleSwitchProfile = () => {
-    clearProfile();
-    setProfile(null);
-    setNicknameInput("");
-    setPinInput("");
-    setIsEditingProfile(true);
-  };
-
   const handleSubmit = async () => {
     if (!profile) {
       setErrorMessage("먼저 닉네임과 PIN을 설정해주세요.");
@@ -208,13 +200,10 @@ export default function ReviewModal({ restaurant, onClose, onSubmitted }) {
           </button>
         </div>
 
-        {/* 프로필 영역: 이미 설정되어 있으면 읽기 전용으로 표시, 없으면 설정 폼 */}
+        {/* 프로필 영역: 이미 설정되어 있으면 읽기 전용으로 표시 (전환 불가 - 이 브라우저의 고정 닉네임) */}
         {!isEditingProfile && profile ? (
           <div
             style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
               background: "var(--color-teal-light)",
               borderRadius: 8,
               padding: "10px 12px",
@@ -224,19 +213,6 @@ export default function ReviewModal({ restaurant, onClose, onSubmitted }) {
             <span style={{ fontSize: 13, fontWeight: 600 }}>
               "{profile.nickname}" 님으로 작성됩니다
             </span>
-            <button
-              onClick={handleSwitchProfile}
-              style={{
-                fontSize: 11,
-                color: "#666",
-                background: "transparent",
-                border: "none",
-                textDecoration: "underline",
-                cursor: "pointer",
-              }}
-            >
-              다른 사람으로 전환
-            </button>
           </div>
         ) : (
           <div style={{ marginBottom: 16 }}>

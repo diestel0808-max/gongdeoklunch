@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import AddRestaurantModal from "@/components/AddRestaurantModal";
 import HeartIcon from "@/components/HeartIcon";
 import NoticeBanner from "@/components/NoticeBanner";
+import OnboardingModal from "@/components/OnboardingModal";
 import ShareButton from "@/components/ShareButton";
 import KakaoMap from "@/components/KakaoMap";
 import LunchPickerModal from "@/components/LunchPickerModal";
@@ -13,6 +14,7 @@ import { CATEGORIES, DISTANCE_FILTER_OPTIONS, GROUP_SIZE_OPTIONS, OFFICE, PRICE_
 import { getCustomRestaurants } from "@/lib/customRestaurantStorage";
 import {
   getAllReviews,
+  getProfile,
   getReviewsForRestaurantFrom,
   getRestaurantFilterDataFrom,
   hasLikedReview,
@@ -297,6 +299,14 @@ export default function HomePage() {
   const [isDesktop, setIsDesktop] = useState(false);
   const [allReviews, setAllReviews] = useState([]);
   const [allFavorites, setAllFavorites] = useState([]);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
+  useEffect(() => {
+    // 이 브라우저에 저장된 닉네임이 없으면(첫 접속) 온보딩 팝업을 띄움
+    if (!getProfile()) {
+      setShowOnboarding(true);
+    }
+  }, []);
 
   const refreshAllReviews = useCallback(async () => {
     setAllReviews(await getAllReviews());
@@ -760,6 +770,13 @@ export default function HomePage() {
             getCustomRestaurants().then(setCustomRestaurants);
             setShowAddRestaurant(false);
           }}
+        />
+      )}
+
+      {showOnboarding && (
+        <OnboardingModal
+          onClose={() => setShowOnboarding(false)}
+          onComplete={() => setShowOnboarding(false)}
         />
       )}
     </main>
