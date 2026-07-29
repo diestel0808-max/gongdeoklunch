@@ -137,6 +137,26 @@ export default function ReviewModal({ restaurant, onClose, onSubmitted }) {
     }
   };
 
+  const hasUnsavedContent = () =>
+    waiting.length > 0 ||
+    headcount.length > 0 ||
+    recommendedFor.length > 0 ||
+    Boolean(priceRange) ||
+    Boolean(priceFeel) ||
+    Boolean(revisit) ||
+    menu.trim().length > 0 ||
+    comment.trim().length > 0;
+
+  const handleRequestClose = () => {
+    if (hasUnsavedContent()) {
+      const proceed = window.confirm(
+        "작성 중인 내용이 있어요. 지금 닫으면 등록되지 않아요. 그래도 닫을까요?"
+      );
+      if (!proceed) return;
+    }
+    onClose();
+  };
+
   return (
     <div
       style={{
@@ -148,7 +168,7 @@ export default function ReviewModal({ restaurant, onClose, onSubmitted }) {
         justifyContent: "center",
         zIndex: 50,
       }}
-      onClick={onClose}
+      onClick={handleRequestClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
@@ -172,7 +192,7 @@ export default function ReviewModal({ restaurant, onClose, onSubmitted }) {
         >
           <h2 style={{ fontSize: 16, fontWeight: 700 }}>{restaurant.name} 후기 남기기</h2>
           <button
-            onClick={onClose}
+            onClick={handleRequestClose}
             style={{ border: "none", background: "transparent", fontSize: 18, cursor: "pointer" }}
           >
             ✕

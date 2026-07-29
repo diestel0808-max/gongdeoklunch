@@ -10,7 +10,7 @@ import {
   REVISIT_OPTIONS,
   WAITING_LEVELS,
 } from "@/lib/constants";
-import { deleteReview, getMyReviews, getProfile, updateReview } from "@/lib/reviewStorage";
+import { clearProfile, deleteReview, getMyReviews, getProfile, updateReview } from "@/lib/reviewStorage";
 import { getMyFavoriteRestaurantIds, toggleFavorite } from "@/lib/favoriteStorage";
 
 function joinValues(value) {
@@ -122,6 +122,12 @@ export default function MyPageModal({ restaurants, onClose, onChanged, onFavorit
   const findRestaurantName = (restaurantId) => {
     const found = restaurants?.find((r) => String(r.id) === String(restaurantId));
     return found ? { name: found.name, category: found.category } : null;
+  };
+
+  const handleLogout = () => {
+    if (!window.confirm("로그아웃할까요? 이 브라우저에 저장된 닉네임 정보가 지워져요.")) return;
+    clearProfile();
+    onClose();
   };
 
   const handleUnfavorite = async (restaurantId) => {
@@ -237,8 +243,9 @@ export default function MyPageModal({ restaurants, onClose, onChanged, onFavorit
 
         {!editingReview && (
           <>
-            <p style={{ fontSize: 12, color: "#999", marginBottom: 12 }}>
-              "{profile.nickname}" 님의 활동이에요.
+            <p style={{ fontSize: 15, color: "#333", lineHeight: 1.8, marginBottom: 12 }}>
+              <span style={{ fontSize: 17, fontWeight: 700 }}>"{profile.nickname}"</span> 님의
+              활동이에요.
             </p>
             <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
               <button
@@ -274,6 +281,20 @@ export default function MyPageModal({ restaurants, onClose, onChanged, onFavorit
                 ❤️ 내가 찜한 식당 ({myFavoriteIds.length})
               </button>
             </div>
+            <button
+              onClick={handleLogout}
+              style={{
+                fontSize: 12,
+                color: "#999",
+                background: "transparent",
+                border: "none",
+                textDecoration: "underline",
+                cursor: "pointer",
+                marginBottom: 16,
+              }}
+            >
+              로그아웃
+            </button>
           </>
         )}
 

@@ -77,7 +77,7 @@ export default function RestaurantDetailPanel({ restaurant, onClose, inline = fa
         onClick={inline ? undefined : (e) => e.stopPropagation()}
         style={innerStyle}
       >
-        {/* 상단 바: PC 인라인 모드는 "목록으로" 링크, 모바일 오버레이는 닫기(X) */}
+        {/* 상단 바: 항상 "← 목록으로"를 크고 잘 보이게, X는 보조로 오른쪽에 */}
         <div
           style={{
             position: "sticky",
@@ -85,26 +85,27 @@ export default function RestaurantDetailPanel({ restaurant, onClose, inline = fa
             background: "#fff",
             zIndex: 1,
             display: "flex",
-            justifyContent: inline ? "flex-start" : "flex-end",
-            padding: "10px 14px",
+            justifyContent: "space-between",
+            alignItems: "center",
+            padding: "12px 14px",
             borderBottom: "1px solid var(--color-gray-300)",
           }}
         >
-          {inline ? (
-            <button
-              onClick={onClose}
-              style={{
-                border: "none",
-                background: "transparent",
-                fontSize: 13,
-                fontWeight: 700,
-                color: "var(--color-navy)",
-                cursor: "pointer",
-              }}
-            >
-              ← 목록으로
-            </button>
-          ) : (
+          <button
+            onClick={onClose}
+            style={{
+              border: "none",
+              background: "transparent",
+              fontSize: 15,
+              fontWeight: 700,
+              color: "var(--color-navy)",
+              cursor: "pointer",
+              padding: "4px 0",
+            }}
+          >
+            ← 목록으로
+          </button>
+          {!inline && (
             <button
               onClick={onClose}
               style={{ border: "none", background: "transparent", fontSize: 20, cursor: "pointer" }}
@@ -260,8 +261,8 @@ export default function RestaurantDetailPanel({ restaurant, onClose, inline = fa
                     marginBottom: 14,
                   }}
                 >
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", fontSize: 14 }}>
-                    <span style={{ fontWeight: 700 }}>{review.nickname}</span>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", fontSize: 14, lineHeight: 2 }}>
+                    <span style={{ fontWeight: 700, fontSize: 15 }}>{review.nickname}</span>
                     <span style={{ color: "#999" }}>·</span>
                     <span style={{ color: "#555" }}>⏱ {joinValues(review.waiting)}</span>
                     <span style={{ color: "#555" }}>👤 {joinValues(review.headcount)}</span>

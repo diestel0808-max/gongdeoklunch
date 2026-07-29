@@ -235,8 +235,8 @@ function RestaurantCard({
             const liked = hasLikedReview(review);
             return (
               <div key={review.id} style={{ marginBottom: 10 }}>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", fontSize: 13 }}>
-                  <span style={{ fontWeight: 700 }}>{review.nickname}</span>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", fontSize: 13, lineHeight: 2 }}>
+                  <span style={{ fontWeight: 700, fontSize: 14 }}>{review.nickname}</span>
                   <span style={{ color: "#999" }}>·</span>
                   <span style={{ color: "#666" }}>⏱ {joinValues(review.waiting)}</span>
                   <span style={{ color: "#666" }}>👤 {joinValues(review.headcount)}</span>
@@ -516,15 +516,17 @@ export default function HomePage() {
 
       <style>{`
         .app-content { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+        .map-pane { flex-shrink: 0; }
+        .list-pane { flex: 1; overflow-y: auto; min-height: 0; }
         @media (min-width: 768px) {
           .app-content { flex-direction: row; }
-          .map-pane { width: 42% !important; height: 100% !important; flex-shrink: 0; }
-          .list-pane { width: 58%; height: 100%; overflow-y: auto; }
+          .map-pane { width: 42% !important; height: 100% !important; }
+          .list-pane { width: 58%; height: 100%; }
         }
       `}</style>
 
       <div className="app-content">
-        <div className="map-pane" style={{ height: "40vh", minHeight: 220 }}>
+        <div className="map-pane" style={{ height: "28vh", minHeight: 180 }}>
           <KakaoMap
             restaurants={sortedRestaurants}
             highlightedId={detailTarget?.id}
@@ -783,6 +785,7 @@ export default function HomePage() {
 
       {showAddRestaurant && (
         <AddRestaurantModal
+          existingRestaurants={restaurants}
           onClose={() => setShowAddRestaurant(false)}
           onAdded={() => {
             getCustomRestaurants().then(setCustomRestaurants);

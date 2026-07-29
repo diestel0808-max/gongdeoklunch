@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { CATEGORIES } from "@/lib/constants";
 import { addCustomRestaurant } from "@/lib/customRestaurantStorage";
 import { loadKakaoMapScript } from "@/lib/kakaoLoader";
+import { getDistanceMeters } from "@/lib/distance";
 
-export default function AddRestaurantModal({ onClose, onAdded }) {
+export default function AddRestaurantModal({ onClose, onAdded, existingRestaurants = [] }) {
   const [keyword, setKeyword] = useState("");
   const [results, setResults] = useState([]);
   const [selectedPlace, setSelectedPlace] = useState(null);
@@ -42,9 +43,29 @@ export default function AddRestaurantModal({ onClose, onAdded }) {
     }
   };
 
+  // 이름이 같거나(공백 무시), 좌표가 아주 가까우면(15m 이내) 이미 등록된 곳으로 판단
+  const duplicateRestaurant = useMemo(() => {
+    if (!selectedPlace) return null;
+    const normalizedName = selectedPlace.place_name.replace(/\s/g, "");
+    const lat = Number(selectedPlace.y);
+    const lng = Number(selectedPlace.x);
+
+    return (
+      existingRestaurants.find((r) => {
+        const nameMatch = (r.name || "").replace(/\s/g, "") === normalizedName;
+        const distance = getDistanceMeters(r.lat, r.lng, lat, lng);
+        return nameMatch || distance < 15;
+      }) || null
+    );
+  }, [selectedPlace, existingRestaurants]);
+
   const handleSubmit = async () => {
     if (!selectedPlace) {
       setErrorMessage("먼저 검색 결과에서 식당을 선택해주세요.");
+      return;
+    }
+    if (duplicateRestaurant) {
+      setErrorMessage("이미 등록된 식당이에요. 목록에서 확인해주세요.");
       return;
     }
     if (!category) {
@@ -181,7 +202,27 @@ export default function AddRestaurantModal({ onClose, onAdded }) {
           </div>
         )}
 
-        {selectedPlace && (
+        {selectedPlace && duplicateRestaurant && (
+          <div
+            style={{
+              background: "#fff4e5",
+              border: "1px solid #f0c060",
+              borderRadius: 10,
+              padding: 12,
+              marginBottom: 16,
+            }}
+          >
+            <p style={{ fontSize: 13, fontWeight: 700, color: "#9a6a00" }}>
+              ⚠️ 이미 등록된 식당이에요!
+            </p>
+            <p style={{ fontSize: 12, color: "#9a6a00", marginTop: 4 }}>
+              "{duplicateRestaurant.name}"(으)로 이미 목록에 있어요. 후기를 남기고 싶다면 홈
+              화면에서 검색해서 "후기 남기기"를 이용해주세요.
+            </p>
+          </div>
+        )}
+
+        {selectedPlace && !duplicateRestaurant && (
           <div style={{ marginBottom: 16 }}>
             <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>카테고리 선택</p>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
