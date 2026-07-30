@@ -6,6 +6,7 @@ import { createProfile, loginByPhone, saveProfile, verifyProfile } from "@/lib/r
 export default function OnboardingModal({ onClose, onComplete }) {
   const [showSignup, setShowSignup] = useState(false);
   const [loginMode, setLoginMode] = useState("nickname"); // nickname | phone
+  const [showForgotHelp, setShowForgotHelp] = useState(false);
 
   const [loginNickname, setLoginNickname] = useState("");
   const [loginPin, setLoginPin] = useState("");
@@ -292,6 +293,58 @@ export default function OnboardingModal({ onClose, onComplete }) {
           </>
         )}
 
+        <div style={{ position: "relative", marginTop: 8 }}>
+          <button
+            onClick={() => setShowForgotHelp((v) => !v)}
+            style={{
+              fontSize: 12,
+              color: "#999",
+              background: "transparent",
+              border: "none",
+              textDecoration: "underline",
+              cursor: "pointer",
+              padding: 0,
+            }}
+          >
+            PIN을 잊어버렸나요?
+          </button>
+
+          {showForgotHelp && (
+            <div
+              style={{
+                position: "absolute",
+                top: "calc(100% + 8px)",
+                left: 0,
+                background: "var(--color-navy)",
+                color: "#fff",
+                fontSize: 12,
+                lineHeight: 1.6,
+                padding: "10px 14px",
+                borderRadius: 10,
+                boxShadow: "0 8px 20px rgba(0,0,0,0.25)",
+                zIndex: 10,
+                whiteSpace: "nowrap",
+              }}
+            >
+              <div
+                style={{
+                  position: "absolute",
+                  top: -6,
+                  left: 16,
+                  width: 0,
+                  height: 0,
+                  borderLeft: "6px solid transparent",
+                  borderRight: "6px solid transparent",
+                  borderBottom: "6px solid var(--color-navy)",
+                }}
+              />
+              <strong>관리자 문의)</strong>
+              <br />
+              비즈니스임팩트1팀 인턴 김다인
+            </div>
+          )}
+        </div>
+
         <div
           style={{
             marginTop: 20,
@@ -334,15 +387,12 @@ export default function OnboardingModal({ onClose, onComplete }) {
               />
 
               <input
-                placeholder="전화번호 (선택 - 나중에 로그인 복구용)"
+                placeholder="전화번호 입력 시 닉네임 없이 로그인 가능"
                 value={signupPhone}
                 inputMode="numeric"
                 onChange={(e) => setSignupPhone(e.target.value.replace(/[^0-9]/g, ""))}
                 style={{ ...inputStyle, width: "100%", marginBottom: 8 }}
               />
-              <p style={{ fontSize: 11, color: "#0a8fa0", marginTop: -4, marginBottom: 8 }}>
-                💡 입력해두면 나중에 닉네임을 잊어버려도 전화번호+PIN으로 로그인할 수 있어요.
-              </p>
 
               <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
                 <input
@@ -364,7 +414,8 @@ export default function OnboardingModal({ onClose, onComplete }) {
               </div>
 
               <p style={{ fontSize: 11, color: "#d9822b", fontWeight: 600, marginBottom: 12 }}>
-                ⚠️ 닉네임과 PIN은 한 번 정하면 이후 수정이 어려워요. 신중하게 정해주세요!
+                ⚠️ 닉네임과 PIN은 한 번 정하면 이후 수정이 어려워요. 신중하게 정하고,{" "}
+                <strong>PIN은 꼭 기억해주세요!</strong>
               </p>
 
               <button
