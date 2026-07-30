@@ -1,12 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createProfile, loginByPhone, saveProfile, verifyProfile } from "@/lib/reviewStorage";
 
 export default function OnboardingModal({ onClose, onComplete }) {
   const [showSignup, setShowSignup] = useState(false);
   const [loginMode, setLoginMode] = useState("nickname"); // nickname | phone
   const [showForgotHelp, setShowForgotHelp] = useState(false);
+  const forgotHelpRef = useRef(null);
+
+  useEffect(() => {
+    if (!showForgotHelp) return;
+    const handleOutsideClick = (e) => {
+      if (forgotHelpRef.current && !forgotHelpRef.current.contains(e.target)) {
+        setShowForgotHelp(false);
+      }
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, [showForgotHelp]);
 
   const [loginNickname, setLoginNickname] = useState("");
   const [loginPin, setLoginPin] = useState("");
@@ -76,8 +88,8 @@ export default function OnboardingModal({ onClose, onComplete }) {
   };
 
   const handleSignup = async () => {
-    if (!signupNickname.trim() || signupPin.trim().length !== 6) {
-      setSignupError("닉네임과 6자리 PIN을 입력해주세요.");
+    if (!signupNickname.trim() || !signupPhone.trim() || signupPin.trim().length !== 6) {
+      setSignupError("닉네임, 전화번호, 6자리 PIN을 모두 입력해주세요.");
       return;
     }
     if (signupPin.trim() !== signupPinConfirm.trim()) {
@@ -293,7 +305,7 @@ export default function OnboardingModal({ onClose, onComplete }) {
           </>
         )}
 
-        <div style={{ position: "relative", marginTop: 8 }}>
+        <div ref={forgotHelpRef} style={{ position: "relative", marginTop: 8 }}>
           <button
             onClick={() => setShowForgotHelp((v) => !v)}
             style={{
@@ -387,7 +399,7 @@ export default function OnboardingModal({ onClose, onComplete }) {
               />
 
               <input
-                placeholder="전화번호 입력 시 닉네임 없이 로그인 가능"
+                placeholder="전화번호 입력 (닉네임 대신 로그인 가능)"
                 value={signupPhone}
                 inputMode="numeric"
                 onChange={(e) => setSignupPhone(e.target.value.replace(/[^0-9]/g, ""))}
