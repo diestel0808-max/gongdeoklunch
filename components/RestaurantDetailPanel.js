@@ -239,8 +239,15 @@ export default function RestaurantDetailPanel({ restaurant, onClose, inline = fa
           </div>
 
           {/* 후기 목록 - 접기/펼치기 없이 항상 전부 표시, 공감 많은 순 */}
-          <div style={{ marginTop: 26 }}>
-            <h2 style={{ fontSize: 17, fontWeight: 700, marginBottom: 12 }}>
+          <div
+            style={{
+              marginTop: 26,
+              background: "var(--color-gray-100)",
+              borderRadius: 14,
+              padding: 16,
+            }}
+          >
+            <h2 style={{ fontSize: 17, fontWeight: 700, marginBottom: 12, color: "#666" }}>
               후기 {reviews.length}개
             </h2>
 
@@ -256,9 +263,10 @@ export default function RestaurantDetailPanel({ restaurant, onClose, inline = fa
                 <div
                   key={review.id}
                   style={{
-                    borderBottom: "1px solid var(--color-gray-300)",
-                    paddingBottom: 14,
-                    marginBottom: 14,
+                    background: "#fff",
+                    borderRadius: 10,
+                    padding: 14,
+                    marginBottom: 10,
                   }}
                 >
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap", fontSize: 14, lineHeight: 2 }}>

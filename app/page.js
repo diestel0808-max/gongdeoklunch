@@ -229,12 +229,35 @@ function RestaurantCard({
       </div>
 
       {/* 후기는 접기/펼치기 없이 항상 전부 표시, 공감 많은 순 정렬 */}
+      {/* 매장 정보와 구분되도록 연한 회색 배경 박스로 감쌈 */}
       {reviews.length > 0 && (
-        <div style={{ marginTop: 12, borderTop: "1px solid var(--color-gray-300)", paddingTop: 10 }}>
-          {reviews.map((review) => {
+        <div
+          style={{
+            marginTop: 14,
+            marginLeft: -18,
+            marginRight: -18,
+            marginBottom: -18,
+            background: "var(--color-gray-100)",
+            borderTop: "1px solid var(--color-gray-300)",
+            borderRadius: "0 0 12px 12px",
+            padding: "14px 18px 18px",
+          }}
+        >
+          <p style={{ fontSize: 12, fontWeight: 700, color: "#888", marginBottom: 8 }}>
+            후기 {reviews.length}개
+          </p>
+          {reviews.slice(0, 2).map((review) => {
             const liked = hasLikedReview(review);
             return (
-              <div key={review.id} style={{ marginBottom: 10 }}>
+              <div
+                key={review.id}
+                style={{
+                  background: "#fff",
+                  borderRadius: 10,
+                  padding: 12,
+                  marginBottom: 8,
+                }}
+              >
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", fontSize: 13, lineHeight: 2 }}>
                   <span style={{ fontWeight: 700, fontSize: 14 }}>{review.nickname}</span>
                   <span style={{ color: "#999" }}>·</span>
@@ -274,6 +297,25 @@ function RestaurantCard({
               </div>
             );
           })}
+          {reviews.length > 2 && (
+            <button
+              onClick={() => onOpenDetail(restaurant)}
+              style={{
+                display: "block",
+                width: "100%",
+                textAlign: "center",
+                fontSize: 12,
+                fontWeight: 700,
+                color: "var(--color-navy)",
+                background: "transparent",
+                border: "none",
+                padding: "6px 0 2px",
+                cursor: "pointer",
+              }}
+            >
+              후기 {reviews.length - 2}개 더 보기 →
+            </button>
+          )}
         </div>
       )}
     </div>
