@@ -1,17 +1,24 @@
 "use client";
 
 import { useState } from "react";
-import { createProfile, saveProfile, verifyProfile } from "@/lib/reviewStorage";
+import { createProfile, loginByPhone, saveProfile, verifyProfile } from "@/lib/reviewStorage";
 
 export default function OnboardingModal({ onClose, onComplete }) {
   const [showSignup, setShowSignup] = useState(false);
+  const [loginMode, setLoginMode] = useState("nickname"); // nickname | phone
 
   const [loginNickname, setLoginNickname] = useState("");
   const [loginPin, setLoginPin] = useState("");
   const [loginError, setLoginError] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
+  const [loginPhone, setLoginPhone] = useState("");
+  const [loginPhonePin, setLoginPhonePin] = useState("");
+  const [phoneLoginError, setPhoneLoginError] = useState("");
+  const [isPhoneLoggingIn, setIsPhoneLoggingIn] = useState(false);
+
   const [signupNickname, setSignupNickname] = useState("");
+  const [signupPhone, setSignupPhone] = useState("");
   const [signupPin, setSignupPin] = useState("");
   const [signupPinConfirm, setSignupPinConfirm] = useState("");
   const [signupError, setSignupError] = useState("");
@@ -33,7 +40,6 @@ export default function OnboardingModal({ onClose, onComplete }) {
 
     if (!result.ok) {
       setLoginError(result.message);
-      // 등록된 적 없는 닉네임이면, 바로 가입할 수 있도록 아래 섹션을 자동으로 펼치고 닉네임을 채워줌
       if (result.message.includes("등록되지 않은")) {
         setShowSignup(true);
         setSignupNickname(nickname);
@@ -43,6 +49,29 @@ export default function OnboardingModal({ onClose, onComplete }) {
 
     saveProfile({ nickname, pin });
     onComplete({ nickname, pin });
+  };
+
+  const handlePhoneLogin = async () => {
+    if (!loginPhone.trim() || loginPhonePin.trim().length !== 6) {
+      setPhoneLoginError("전화번호와 6자리 PIN을 입력해주세요.");
+      return;
+    }
+    setIsPhoneLoggingIn(true);
+    setPhoneLoginError("");
+
+    const phone = loginPhone.trim();
+    const pin = loginPhonePin.trim();
+    const result = await loginByPhone(phone, pin);
+
+    setIsPhoneLoggingIn(false);
+
+    if (!result.ok) {
+      setPhoneLoginError(result.message);
+      return;
+    }
+
+    saveProfile({ nickname: result.nickname, pin });
+    onComplete({ nickname: result.nickname, pin });
   };
 
   const handleSignup = async () => {
@@ -59,8 +88,9 @@ export default function OnboardingModal({ onClose, onComplete }) {
     setSignupError("");
 
     const nickname = signupNickname.trim();
+    const phone = signupPhone.trim();
     const pin = signupPin.trim();
-    const result = await createProfile(nickname, pin);
+    const result = await createProfile(nickname, phone, pin);
 
     setIsSigningUp(false);
 
@@ -71,6 +101,13 @@ export default function OnboardingModal({ onClose, onComplete }) {
 
     saveProfile({ nickname, pin });
     onComplete({ nickname, pin });
+  };
+
+  const inputStyle = {
+    padding: "9px 10px",
+    borderRadius: 8,
+    border: "1px solid var(--color-gray-300)",
+    fontSize: 13,
   };
 
   return (
@@ -91,6 +128,8 @@ export default function OnboardingModal({ onClose, onComplete }) {
           background: "#fff",
           width: "100%",
           maxWidth: 420,
+          maxHeight: "80vh",
+          overflowY: "auto",
           borderRadius: 16,
           padding: 22,
           position: "relative",
@@ -135,54 +174,123 @@ export default function OnboardingModal({ onClose, onComplete }) {
           필요가 없어요.
         </p>
 
-        <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>닉네임 + PIN 입력하기</p>
-        <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-          <input
-            placeholder="닉네임"
-            value={loginNickname}
-            onChange={(e) => setLoginNickname(e.target.value)}
-            style={{
-              flex: 2,
-              padding: "9px 10px",
-              borderRadius: 8,
-              border: "1px solid var(--color-gray-300)",
-              fontSize: 13,
-            }}
-          />
-          <input
-            placeholder="PIN 6자리"
-            value={loginPin}
-            maxLength={6}
-            inputMode="numeric"
-            onChange={(e) => setLoginPin(e.target.value.replace(/[^0-9]/g, ""))}
+        <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+          <button
+            onClick={() => setLoginMode("nickname")}
             style={{
               flex: 1,
-              padding: "9px 10px",
+              padding: "6px 0",
               borderRadius: 8,
-              border: "1px solid var(--color-gray-300)",
-              fontSize: 13,
+              border: "none",
+              background: loginMode === "nickname" ? "var(--color-navy)" : "var(--color-gray-100)",
+              color: loginMode === "nickname" ? "#fff" : "#666",
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: "pointer",
             }}
-          />
+          >
+            닉네임으로 로그인
+          </button>
+          <button
+            onClick={() => setLoginMode("phone")}
+            style={{
+              flex: 1,
+              padding: "6px 0",
+              borderRadius: 8,
+              border: "none",
+              background: loginMode === "phone" ? "var(--color-navy)" : "var(--color-gray-100)",
+              color: loginMode === "phone" ? "#fff" : "#666",
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >
+            📱 전화번호로 로그인
+          </button>
         </div>
-        <button
-          onClick={handleLogin}
-          disabled={isLoggingIn}
-          style={{
-            width: "100%",
-            padding: "11px 0",
-            borderRadius: 8,
-            border: "none",
-            background: "var(--color-navy)",
-            color: "#fff",
-            fontWeight: 700,
-            fontSize: 14,
-            cursor: isLoggingIn ? "default" : "pointer",
-            opacity: isLoggingIn ? 0.6 : 1,
-          }}
-        >
-          {isLoggingIn ? "확인 중..." : "입장하기"}
-        </button>
-        {loginError && <p style={{ fontSize: 12, color: "#d33", marginTop: 8 }}>{loginError}</p>}
+
+        {loginMode === "nickname" ? (
+          <>
+            <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+              <input
+                placeholder="닉네임"
+                value={loginNickname}
+                onChange={(e) => setLoginNickname(e.target.value)}
+                style={{ ...inputStyle, flex: 2 }}
+              />
+              <input
+                placeholder="PIN 6자리"
+                value={loginPin}
+                maxLength={6}
+                inputMode="numeric"
+                onChange={(e) => setLoginPin(e.target.value.replace(/[^0-9]/g, ""))}
+                style={{ ...inputStyle, flex: 1 }}
+              />
+            </div>
+            <button
+              onClick={handleLogin}
+              disabled={isLoggingIn}
+              style={{
+                width: "100%",
+                padding: "11px 0",
+                borderRadius: 8,
+                border: "none",
+                background: "var(--color-navy)",
+                color: "#fff",
+                fontWeight: 700,
+                fontSize: 14,
+                cursor: isLoggingIn ? "default" : "pointer",
+                opacity: isLoggingIn ? 0.6 : 1,
+              }}
+            >
+              {isLoggingIn ? "확인 중..." : "입장하기"}
+            </button>
+            {loginError && <p style={{ fontSize: 12, color: "#d33", marginTop: 8 }}>{loginError}</p>}
+          </>
+        ) : (
+          <>
+            <p style={{ fontSize: 11, color: "#999", marginBottom: 8 }}>
+              닉네임이 기억 안 나도, 가입할 때 등록한 전화번호+PIN으로 내 계정을 바로 찾을 수
+              있어요.
+            </p>
+            <input
+              placeholder="전화번호 (예: 01012345678)"
+              value={loginPhone}
+              inputMode="numeric"
+              onChange={(e) => setLoginPhone(e.target.value.replace(/[^0-9]/g, ""))}
+              style={{ ...inputStyle, width: "100%", marginBottom: 8 }}
+            />
+            <input
+              placeholder="PIN 6자리"
+              value={loginPhonePin}
+              maxLength={6}
+              inputMode="numeric"
+              onChange={(e) => setLoginPhonePin(e.target.value.replace(/[^0-9]/g, ""))}
+              style={{ ...inputStyle, width: "100%", marginBottom: 8 }}
+            />
+            <button
+              onClick={handlePhoneLogin}
+              disabled={isPhoneLoggingIn}
+              style={{
+                width: "100%",
+                padding: "11px 0",
+                borderRadius: 8,
+                border: "none",
+                background: "var(--color-navy)",
+                color: "#fff",
+                fontWeight: 700,
+                fontSize: 14,
+                cursor: isPhoneLoggingIn ? "default" : "pointer",
+                opacity: isPhoneLoggingIn ? 0.6 : 1,
+              }}
+            >
+              {isPhoneLoggingIn ? "확인 중..." : "입장하기"}
+            </button>
+            {phoneLoginError && (
+              <p style={{ fontSize: 12, color: "#d33", marginTop: 8 }}>{phoneLoginError}</p>
+            )}
+          </>
+        )}
 
         <div
           style={{
@@ -222,15 +330,20 @@ export default function OnboardingModal({ onClose, onComplete }) {
                 placeholder="새 닉네임 (예: 공덕맛집탐험가)"
                 value={signupNickname}
                 onChange={(e) => setSignupNickname(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "9px 10px",
-                  borderRadius: 8,
-                  border: "1px solid var(--color-gray-300)",
-                  fontSize: 13,
-                  marginBottom: 8,
-                }}
+                style={{ ...inputStyle, width: "100%", marginBottom: 8 }}
               />
+
+              <input
+                placeholder="전화번호 (선택 - 나중에 로그인 복구용)"
+                value={signupPhone}
+                inputMode="numeric"
+                onChange={(e) => setSignupPhone(e.target.value.replace(/[^0-9]/g, ""))}
+                style={{ ...inputStyle, width: "100%", marginBottom: 8 }}
+              />
+              <p style={{ fontSize: 11, color: "#0a8fa0", marginTop: -4, marginBottom: 8 }}>
+                💡 입력해두면 나중에 닉네임을 잊어버려도 전화번호+PIN으로 로그인할 수 있어요.
+              </p>
+
               <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
                 <input
                   placeholder="PIN 6자리"
@@ -238,13 +351,7 @@ export default function OnboardingModal({ onClose, onComplete }) {
                   maxLength={6}
                   inputMode="numeric"
                   onChange={(e) => setSignupPin(e.target.value.replace(/[^0-9]/g, ""))}
-                  style={{
-                    flex: 1,
-                    padding: "9px 10px",
-                    borderRadius: 8,
-                    border: "1px solid var(--color-gray-300)",
-                    fontSize: 13,
-                  }}
+                  style={{ ...inputStyle, flex: 1 }}
                 />
                 <input
                   placeholder="PIN 확인"
@@ -252,13 +359,7 @@ export default function OnboardingModal({ onClose, onComplete }) {
                   maxLength={6}
                   inputMode="numeric"
                   onChange={(e) => setSignupPinConfirm(e.target.value.replace(/[^0-9]/g, ""))}
-                  style={{
-                    flex: 1,
-                    padding: "9px 10px",
-                    borderRadius: 8,
-                    border: "1px solid var(--color-gray-300)",
-                    fontSize: 13,
-                  }}
+                  style={{ ...inputStyle, flex: 1 }}
                 />
               </div>
 

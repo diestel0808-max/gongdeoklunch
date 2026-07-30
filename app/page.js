@@ -259,7 +259,7 @@ function RestaurantCard({
                 }}
               >
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", fontSize: 13, lineHeight: 2 }}>
-                  <span style={{ fontWeight: 700, fontSize: 14 }}>{review.nickname}</span>
+                  <span style={{ fontWeight: 700, fontSize: 14, color: "var(--color-teal-dark)" }}>{review.nickname}</span>
                   <span style={{ color: "#999" }}>·</span>
                   <span style={{ color: "#666" }}>⏱ {joinValues(review.waiting)}</span>
                   <span style={{ color: "#666" }}>👤 {joinValues(review.headcount)}</span>

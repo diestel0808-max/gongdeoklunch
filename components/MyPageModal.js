@@ -244,7 +244,7 @@ export default function MyPageModal({ restaurants, onClose, onChanged, onFavorit
         {!editingReview && (
           <>
             <p style={{ fontSize: 15, color: "#333", lineHeight: 1.8, marginBottom: 12 }}>
-              <span style={{ fontSize: 17, fontWeight: 700 }}>"{profile.nickname}"</span> 님의
+              <span style={{ fontSize: 17, fontWeight: 700, color: "var(--color-teal-dark)" }}>"{profile.nickname}"</span> 님의
               활동이에요.
             </p>
             <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>

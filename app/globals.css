@@ -3,6 +3,7 @@
   --color-navy: #1b2a34;      /* 로고의 진한 네이비/차콜 */
   --color-teal: #1bc5d8;      /* 로고의 포인트 틸 블루 */
   --color-teal-light: #e6f9fb; /* 틸 컬러의 아주 옅은 배경용 */
+  --color-teal-dark: #0d6b74; /* 민트/틸 메인 컬러와 어울리는 어두운 청록색 - 닉네임 등 강조 텍스트용 */
   --color-bg: #ffffff;
   --color-gray-100: #f5f6f7;
   --color-gray-300: #dcdfe2;
