@@ -114,6 +114,16 @@ function RestaurantResultCard({ restaurant, reasonText, reasonColor, onOpenDetai
 
 // 여러 카테고리를 선택했을 때, 정렬만 하면 후기/거리 우세한 카테고리 하나가
 // 상위 결과를 독차지할 수 있어서, 카테고리별로 그룹을 나눈 뒤 라운드로빈으로 섞음
+// 배열을 무작위로 섞음 (Fisher-Yates)
+function shuffleArray(array) {
+  const result = [...array];
+  for (let i = result.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
+
 function interleaveByCategory(sortedList) {
   const buckets = new Map();
   const order = [];
@@ -152,6 +162,7 @@ export default function LunchPickerModal({ restaurants, allReviews, onClose, onO
   const [headcounts, setHeadcounts] = useState([]);
   const [recommendedFors, setRecommendedFors] = useState([]);
   const [waitings, setWaitings] = useState([]);
+  const [resultSeed, setResultSeed] = useState(0);
 
   const distanceOptions = DISTANCE_FILTER_OPTIONS.filter((o) => o.maxWalkMinutes !== null);
   const categoryOptions = CATEGORIES.filter((c) => c !== "전체");
@@ -206,16 +217,17 @@ export default function LunchPickerModal({ restaurants, allReviews, onClose, onO
 
     const primary = categories.length > 1 ? interleaveByCategory(primarySorted) : primarySorted;
 
-    const secondarySorted =
-      totalSoftGroups > 0
-        ? hardMatchList
-            .filter((r) => r.softMatched < totalSoftGroups)
-            .sort((a, b) => a.restaurant.walkMinutes - b.restaurant.walkMinutes)
-        : [];
+    const secondaryPool =
+      totalSoftGroups > 0 ? hardMatchList.filter((r) => r.softMatched < totalSoftGroups) : [];
+    // 매번 볼 때마다 다른 곳이 보이도록 무작위로 섞은 뒤, 너무 먼 곳만 뽑히지 않게
+    // 거리 상위 절반 안에서만 섞음 (완전 무작위보다 적당히 가까운 곳 위주로)
+    const secondaryShuffled = shuffleArray(
+      [...secondaryPool].sort((a, b) => a.restaurant.walkMinutes - b.restaurant.walkMinutes).slice(0, 16)
+    );
     const secondary =
       categories.length > 1
-        ? interleaveByCategory(secondarySorted).slice(0, 6)
-        : secondarySorted.slice(0, 6);
+        ? interleaveByCategory(secondaryShuffled).slice(0, 6)
+        : secondaryShuffled.slice(0, 6);
 
     return {
       primary,
@@ -223,7 +235,7 @@ export default function LunchPickerModal({ restaurants, allReviews, onClose, onO
       totalConditions:
         totalSoftGroups + (categories.length > 0 ? 1 : 0) + (distances.length > 0 ? 1 : 0),
     };
-  }, [restaurants, allReviews, categories, distances, prices, headcounts, recommendedFors, waitings]);
+  }, [restaurants, allReviews, categories, distances, prices, headcounts, recommendedFors, waitings, resultSeed]);
 
   const topPrimary = evaluated.primary.slice(0, 10);
 
@@ -318,6 +330,7 @@ export default function LunchPickerModal({ restaurants, allReviews, onClose, onO
 
             <button
               onClick={() => {
+                setResultSeed((s) => s + 1);
                 setStep("thinking");
                 setTimeout(() => setStep("result"), 1400);
               }}
