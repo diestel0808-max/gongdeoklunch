@@ -605,6 +605,22 @@ export default function HomePage() {
           >
             🍽 오늘 점심 뭐 먹지?
           </button>
+          <button
+            onClick={() => setShowAddRestaurant(true)}
+            style={{
+              fontSize: 12,
+              padding: "8px 12px",
+              borderRadius: 8,
+              border: "none",
+              background: "var(--color-teal)",
+              color: "#fff",
+              fontWeight: 600,
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+            }}
+          >
+            + 식당 등록
+          </button>
           <ShareButton />
           <button
             onClick={() => setShowMyPage(true)}
@@ -637,22 +653,6 @@ export default function HomePage() {
             }}
           >
             ⚙️
-          </button>
-          <button
-            onClick={() => setShowAddRestaurant(true)}
-            style={{
-              fontSize: 12,
-              padding: "8px 12px",
-              borderRadius: 8,
-              border: "none",
-              background: "var(--color-teal)",
-              color: "#fff",
-              fontWeight: 600,
-              cursor: "pointer",
-              whiteSpace: "nowrap",
-            }}
-          >
-            + 식당 등록
           </button>
         </div>
 
@@ -1033,25 +1033,21 @@ export default function HomePage() {
             <button
               onClick={() => {
                 setShowMobileMenu(false);
-                setShowLunchPicker(true);
-              }}
-              style={mobileMenuItemStyle("var(--color-navy)", "#fff")}
-            >
-              🍽 오늘 점심 뭐 먹지?
-            </button>
-
-            <div style={{ marginBottom: 10 }}>
-              <ShareButton style={{ width: "100%", boxSizing: "border-box", textAlign: "left", padding: "12px 14px" }} />
-            </div>
-
-            <button
-              onClick={() => {
-                setShowMobileMenu(false);
                 setShowMyPage(true);
               }}
               style={mobileMenuItemStyle("#fff", "var(--color-navy)", true)}
             >
               🙋 마이페이지
+            </button>
+
+            <button
+              onClick={() => {
+                setShowMobileMenu(false);
+                setShowLunchPicker(true);
+              }}
+              style={mobileMenuItemStyle("var(--color-navy)", "#fff")}
+            >
+              🍽 오늘 점심 뭐 먹지?
             </button>
 
             <button
@@ -1063,6 +1059,18 @@ export default function HomePage() {
             >
               + 식당 등록
             </button>
+
+            <div style={{ marginBottom: 10 }}>
+              <ShareButton
+                style={{
+                  width: "100%",
+                  boxSizing: "border-box",
+                  textAlign: "left",
+                  padding: "12px 14px",
+                  fontSize: 14,
+                }}
+              />
+            </div>
 
             <button
               onClick={() => {

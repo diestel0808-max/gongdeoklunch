@@ -99,6 +99,7 @@ export default function NoticeBanner() {
             더 알찬 메뉴 추천으로 도움을 드리기 위해{" "}
             <strong>익명 후기, 찜, 식당 등록 기능도 적극 활용해 주세요!</strong>
             <br />
+            <br />
             여러분 오늘도 모두 맛점하세요! 😋🍚
           </p>
         </div>
