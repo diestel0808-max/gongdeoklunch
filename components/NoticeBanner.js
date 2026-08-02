@@ -3,9 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 
 const DISMISS_KEY = "gongdeok-lunch:notice-dismissed";
-const NOTICE_TEXT = `갑작스러운 동기 모임부터 팀 점심 식사 장소 추천까지! 🍽️
-입사 후 매일 11시 30분부터 무한 고민을 시작할 댕턴들을 위해,
-공덕 맛집을 섭렵한 선배들의 찐 후기를 모아모아 [댕턴뭐먹지 맵]을 만들었습니다 🗺️✨
+const NOTICE_TEXT = `갑작스러운 동기들과의 점심 약속부터 팀 점심 장소 추천까지! 🍽️
+
+입사 후 매일 11시 30분부터 무한 고민을 시작할 댕턴들을 위해, 공덕 맛집을 섭렵한 선배들의 찐 후기를 모아모아 [댕턴뭐먹지 맵]을 만들었습니다 🗺️✨
+
 더 알찬 메뉴 추천으로 도움을 드리기 위해 익명 후기, 찜, 식당 등록 기능도 적극 활용해 주세요!
 
 여러분 오늘도 모두 맛점하세요! 😋🍚`;
@@ -51,7 +52,7 @@ export default function NoticeBanner() {
       }}
     >
       <div onClick={() => setExpanded((v) => !v)} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
-        <span style={{ fontSize: 16, flex: 1, fontWeight: 700, color: "var(--color-navy)" }}>
+        <span className="notice-title" style={{ fontSize: 16, flex: 1, fontWeight: 700, color: "var(--color-navy)" }}>
           📢 "오늘 점심 뭐 먹지?" 매일 고민되는 댕턴이라면 주목! 👀{" "}
           <span style={{ fontWeight: 400, color: "#0a8fa0", fontSize: 14 }}>
             {expanded ? "접기 ▲" : "자세히 보기 ▼"}

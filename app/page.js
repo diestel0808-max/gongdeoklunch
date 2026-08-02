@@ -542,6 +542,7 @@ export default function HomePage() {
   return (
     <main style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
       <header
+        className="app-header"
         style={{
           padding: "14px 16px",
           borderBottom: "1px solid var(--color-gray-300)",
@@ -551,8 +552,10 @@ export default function HomePage() {
         }}
       >
         <div>
-          <img src="/logo.png" alt="댕턴뭐먹지" style={{ height: 22, display: "block" }} />
-          <p style={{ fontSize: 12, color: "#7a8288", marginTop: 4 }}>{OFFICE.name} 기준</p>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <img src="/logo.png" alt="댕턴뭐먹지" className="header-logo" style={{ height: 30, display: "block" }} />
+            <p style={{ fontSize: 12, color: "#7a8288" }}>{OFFICE.name} 기준</p>
+          </div>
         </div>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
           <button
@@ -638,6 +641,9 @@ export default function HomePage() {
           .map-pane { width: 42% !important; height: 100% !important; }
           .list-pane { width: 58%; height: 100%; }
           .mobile-only-hint { display: none; }
+          .app-header { padding: 22px 28px !important; }
+          .header-logo { height: 42px !important; }
+          .notice-title { font-size: 14px !important; }
         }
       `}</style>
 
