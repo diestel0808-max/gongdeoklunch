@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AddRestaurantModal from "@/components/AddRestaurantModal";
 import AdminPanel from "@/components/AdminPanel";
 import HeartIcon from "@/components/HeartIcon";
@@ -53,19 +53,28 @@ function filterSelectStyle(isActive) {
 // 리스트 미리보기에서 후기가 너무 길면 몇 줄로 줄이고 "더보기"로 펼칠 수 있게 함
 function TruncatedComment({ text }) {
   const [expanded, setExpanded] = useState(false);
-  const isLong = text.length > 80 || text.split("\n").length > 3;
+  const [isOverflowing, setIsOverflowing] = useState(false);
+  const paragraphRef = useRef(null);
+
+  useEffect(() => {
+    const el = paragraphRef.current;
+    if (!el) return;
+    // 실제로 2줄을 넘어서 잘리는 경우에만 "더보기"를 보여줌 (짧은 후기엔 안 뜸)
+    setIsOverflowing(el.scrollHeight > el.clientHeight + 1);
+  }, [text]);
 
   return (
     <div style={{ marginTop: 4 }}>
       <p
+        ref={paragraphRef}
         style={{
           fontSize: 13,
           color: "#333",
           whiteSpace: "pre-line",
-          ...(isLong && !expanded
+          ...(!expanded
             ? {
                 display: "-webkit-box",
-                WebkitLineClamp: 3,
+                WebkitLineClamp: 2,
                 WebkitBoxOrient: "vertical",
                 overflow: "hidden",
               }
@@ -74,13 +83,13 @@ function TruncatedComment({ text }) {
       >
         {text}
       </p>
-      {isLong && (
+      {isOverflowing && (
         <button
           onClick={() => setExpanded((v) => !v)}
           style={{
             fontSize: 11,
-            color: "var(--color-navy)",
-            fontWeight: 700,
+            color: "#aaa",
+            fontWeight: 400,
             background: "transparent",
             border: "none",
             cursor: "pointer",
@@ -88,7 +97,7 @@ function TruncatedComment({ text }) {
             marginTop: 2,
           }}
         >
-          {expanded ? "접기 ▲" : "더보기 ▼"}
+          {expanded ? "접기" : "더보기"}
         </button>
       )}
     </div>
