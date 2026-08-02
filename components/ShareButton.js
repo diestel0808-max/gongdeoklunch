@@ -13,9 +13,11 @@ export default function ShareButton({ style }) {
     const OG_CACHE_VERSION = "2";
     const shareUrl = `${window.location.origin}/?ogv=${OG_CACHE_VERSION}`;
 
+    // navigator.share에 text를 같이 넣으면 카카오톡에서 링크 미리보기 카드와
+    // 별개로 텍스트 말풍선이 하나 더 붙어서 전송되는 경우가 있어서,
+    // title + url만 넘겨서 링크(오픈그래프 미리보기) 딱 하나만 공유되도록 함.
     const shareData = {
       title: "댕턴 뭐먹지 | 댕턴에 의한, 댕턴을 위한 점메추 지도",
-      text: "같이 메뉴 고르러 가기! 🍚",
       url: shareUrl,
     };
 
