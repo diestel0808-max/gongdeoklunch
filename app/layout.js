@@ -16,9 +16,9 @@ export const metadata = {
     type: "website",
     images: [
       {
-        url: "/logo.png",
-        width: 1651,
-        height: 640,
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
         alt: "댕턴뭐먹지",
       },
     ],
@@ -27,7 +27,7 @@ export const metadata = {
     card: "summary_large_image",
     title: "댕턴 뭐먹지 | 댕턴에 의한, 댕턴을 위한 점메추 지도",
     description: "같이 메뉴 고르러 가기!",
-    images: ["/logo.png"],
+    images: ["/og-image.png"],
   },
 };
 
