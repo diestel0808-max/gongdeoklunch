@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import AddRestaurantModal from "@/components/AddRestaurantModal";
+import AdminPanel from "@/components/AdminPanel";
 import HeartIcon from "@/components/HeartIcon";
 import MyPageModal from "@/components/MyPageModal";
 import NoticeBanner from "@/components/NoticeBanner";
@@ -29,6 +30,7 @@ import {
   toggleFavorite,
 } from "@/lib/favoriteStorage";
 import { cacheRestaurants } from "@/lib/restaurantCache";
+import { getCategoryOverrides, getHiddenRestaurantIds } from "@/lib/adminActions";
 
 function joinValues(value) {
   return Array.isArray(value) ? value.join(", ") : value;
@@ -46,6 +48,51 @@ function filterSelectStyle(isActive) {
     fontWeight: isActive ? 700 : 400,
     cursor: "pointer",
   };
+}
+
+// 리스트 미리보기에서 후기가 너무 길면 몇 줄로 줄이고 "더보기"로 펼칠 수 있게 함
+function TruncatedComment({ text }) {
+  const [expanded, setExpanded] = useState(false);
+  const isLong = text.length > 80 || text.split("\n").length > 3;
+
+  return (
+    <div style={{ marginTop: 4 }}>
+      <p
+        style={{
+          fontSize: 13,
+          color: "#333",
+          whiteSpace: "pre-line",
+          ...(isLong && !expanded
+            ? {
+                display: "-webkit-box",
+                WebkitLineClamp: 3,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+              }
+            : {}),
+        }}
+      >
+        {text}
+      </p>
+      {isLong && (
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          style={{
+            fontSize: 11,
+            color: "var(--color-navy)",
+            fontWeight: 700,
+            background: "transparent",
+            border: "none",
+            cursor: "pointer",
+            padding: 0,
+            marginTop: 2,
+          }}
+        >
+          {expanded ? "접기 ▲" : "더보기 ▼"}
+        </button>
+      )}
+    </div>
+  );
 }
 
 function RestaurantCard({
@@ -214,18 +261,6 @@ function RestaurantCard({
         >
           후기 남기기
         </button>
-        <button
-          style={{
-            fontSize: 13,
-            color: "#aaa",
-            background: "transparent",
-            border: "none",
-            cursor: "pointer",
-            marginLeft: "auto",
-          }}
-        >
-          신고
-        </button>
       </div>
 
       {/* 후기는 접기/펼치기 없이 항상 전부 표시, 공감 많은 순 정렬 */}
@@ -272,9 +307,7 @@ function RestaurantCard({
                     🍽 {review.menu}
                   </p>
                 )}
-                {review.comment && (
-                  <p style={{ fontSize: 13, marginTop: 4, color: "#333", whiteSpace: "pre-line" }}>{review.comment}</p>
-                )}
+                {review.comment && <TruncatedComment text={review.comment} />}
                 <button
                   onClick={() => handleLike(review)}
                   style={{
@@ -333,6 +366,21 @@ export default function HomePage() {
   const [sortOption, setSortOption] = useState("distance"); // distance | favorite | review
   const [apiRestaurants, setApiRestaurants] = useState([]);
   const [customRestaurants, setCustomRestaurants] = useState([]);
+  const [hiddenIds, setHiddenIds] = useState([]);
+  const [categoryOverrides, setCategoryOverrides] = useState({});
+
+  const refreshRestaurantMeta = useCallback(async () => {
+    const [hidden, overrides] = await Promise.all([
+      getHiddenRestaurantIds(),
+      getCategoryOverrides(),
+    ]);
+    setHiddenIds(hidden);
+    setCategoryOverrides(overrides);
+  }, []);
+
+  useEffect(() => {
+    refreshRestaurantMeta();
+  }, [refreshRestaurantMeta]);
   const [status, setStatus] = useState("loading"); // loading | ready | error
   const [errorMessage, setErrorMessage] = useState("");
   const [reviewTarget, setReviewTarget] = useState(null);
@@ -344,6 +392,7 @@ export default function HomePage() {
   const [allFavorites, setAllFavorites] = useState([]);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showMyPage, setShowMyPage] = useState(false);
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
 
   useEffect(() => {
     // 이 브라우저에 저장된 닉네임이 없으면(첫 접속) 온보딩 팝업을 띄움
@@ -380,10 +429,14 @@ export default function HomePage() {
     // 카카오 API 로딩이 끝나기 전에 사용자 등록 식당만 먼저 뜨면 어색해 보이므로,
     // 로딩이 완전히 끝난 뒤에만 두 목록을 합칩니다.
     if (status !== "ready") return [];
-    return [...apiRestaurants, ...customRestaurants].sort(
-      (a, b) => a.distanceMeters - b.distanceMeters
-    );
-  }, [apiRestaurants, customRestaurants, status]);
+    const hiddenSet = new Set(hiddenIds.map(String));
+    return [...apiRestaurants, ...customRestaurants]
+      .filter((r) => !hiddenSet.has(String(r.id)))
+      .map((r) =>
+        categoryOverrides[r.id] ? { ...r, category: categoryOverrides[r.id] } : r
+      )
+      .sort((a, b) => a.distanceMeters - b.distanceMeters);
+  }, [apiRestaurants, customRestaurants, status, hiddenIds, categoryOverrides]);
 
   useEffect(() => {
     cacheRestaurants(restaurants);
@@ -498,8 +551,8 @@ export default function HomePage() {
         }}
       >
         <div>
-          <h1 style={{ fontSize: 16, fontWeight: 700 }}>댕턴뭐먹지</h1>
-          <p style={{ fontSize: 12, color: "#7a8288" }}>{OFFICE.name} 기준</p>
+          <img src="/logo.png" alt="댕턴뭐먹지" style={{ height: 22, display: "block" }} />
+          <p style={{ fontSize: 12, color: "#7a8288", marginTop: 4 }}>{OFFICE.name} 기준</p>
         </div>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
           <button
@@ -536,6 +589,22 @@ export default function HomePage() {
             🙋 마이페이지
           </button>
           <button
+            onClick={() => setShowAdminPanel(true)}
+            style={{
+              fontSize: 12,
+              padding: "8px 12px",
+              borderRadius: 8,
+              border: "1px solid var(--color-gray-300)",
+              background: "#fff",
+              color: "#999",
+              fontWeight: 700,
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+            }}
+          >
+            ⚙️
+          </button>
+          <button
             onClick={() => setShowAddRestaurant(true)}
             style={{
               fontSize: 12,
@@ -556,6 +625,10 @@ export default function HomePage() {
 
       <NoticeBanner />
 
+      <p className="mobile-only-hint" style={{ fontSize: 10, color: "#bbb", textAlign: "center", padding: "4px 0 0" }}>
+        💻 PC 환경에 최적화되어 있어요
+      </p>
+
       <style>{`
         .app-content { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
         .map-pane { flex-shrink: 0; }
@@ -564,6 +637,7 @@ export default function HomePage() {
           .app-content { flex-direction: row; }
           .map-pane { width: 42% !important; height: 100% !important; }
           .list-pane { width: 58%; height: 100%; }
+          .mobile-only-hint { display: none; }
         }
       `}</style>
 
@@ -849,6 +923,18 @@ export default function HomePage() {
           onClose={() => setShowMyPage(false)}
           onChanged={refreshAllReviews}
           onFavoritesChanged={refreshAllFavorites}
+        />
+      )}
+
+      {showAdminPanel && (
+        <AdminPanel
+          restaurants={restaurants}
+          allReviews={allReviews}
+          onClose={() => setShowAdminPanel(false)}
+          onDataChanged={() => {
+            refreshRestaurantMeta();
+            refreshAllReviews();
+          }}
         />
       )}
     </main>
