@@ -723,6 +723,8 @@ export default function HomePage() {
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="식당 이름으로 검색 (예: 두껍삼)"
+          autoComplete="off"
+          name="restaurant-search"
           style={{
             width: "100%",
             padding: "10px 12px",

@@ -157,6 +157,8 @@ export default function AdminPanel({ restaurants, allReviews, onClose, onDataCha
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleUnlock()}
+                autoComplete="new-password"
+                name="admin-access-code"
                 style={{
                   flex: 1,
                   padding: "9px 10px",
