@@ -656,31 +656,33 @@ export default function HomePage() {
           </button>
         </div>
 
-        {/* 모바일에서만 보이는 햄버거 버튼 - 누르면 오른쪽에서 메뉴 서랍이 열림 */}
-        <button
-          className="mobile-menu-btn"
-          onClick={() => setShowMobileMenu(true)}
-          style={{
-            fontSize: 22,
-            width: 40,
-            height: 40,
-            borderRadius: 8,
-            border: "1px solid var(--color-gray-300)",
-            background: "#fff",
-            color: "var(--color-navy)",
-            cursor: "pointer",
-            flexShrink: 0,
-          }}
-        >
-          ☰
-        </button>
+        {/* 모바일 전용: PC 최적화 안내 + 햄버거 버튼 */}
+        <div className="mobile-menu-btn" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <p style={{ fontSize: 10, color: "#bbb", textAlign: "right", lineHeight: 1.3, margin: 0 }}>
+            💻 PC 환경에
+            <br />
+            최적화되어있어요
+          </p>
+          <button
+            onClick={() => setShowMobileMenu(true)}
+            style={{
+              fontSize: 22,
+              width: 40,
+              height: 40,
+              borderRadius: 8,
+              border: "1px solid var(--color-gray-300)",
+              background: "#fff",
+              color: "var(--color-navy)",
+              cursor: "pointer",
+              flexShrink: 0,
+            }}
+          >
+            ☰
+          </button>
+        </div>
       </header>
 
       <NoticeBanner />
-
-      <p className="mobile-only-hint" style={{ fontSize: 10, color: "#bbb", textAlign: "center", padding: "4px 0 0" }}>
-        💻 PC 환경에 최적화되어 있어요
-      </p>
 
       <style>{`
         .app-content { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
@@ -690,7 +692,6 @@ export default function HomePage() {
           .app-content { flex-direction: row; }
           .map-pane { width: 42% !important; height: 100% !important; }
           .list-pane { width: 58%; height: 100%; }
-          .mobile-only-hint { display: none; }
           .app-header { padding: 22px 28px !important; }
           .header-logo { height: 42px !important; }
           .notice-title { font-size: 14px !important; }
