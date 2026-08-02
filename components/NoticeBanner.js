@@ -3,10 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 
 const DISMISS_KEY = "gongdeok-lunch:notice-dismissed";
-const NOTICE_TEXT = `갑작스러운 동기들과의 점심 약속부터 팀 점심 장소 추천까지! 🍽️
-입사 후 매일 11시 30분부터 무한 고민을 시작할 댕턴들을 위해, 공덕 맛집을 섭렵한 선배들의 찐 후기를 모아모아 [댕턴뭐먹지 맵]을 만들었습니다 🗺️✨
-더 알찬 메뉴 추천으로 도움을 드리기 위해 익명 후기, 찜, 식당 등록 기능도 적극 활용해 주세요!
-여러분 오늘도 모두 맛점하세요! 😋🍚`;
 
 export default function NoticeBanner() {
   const [dismissed, setDismissed] = useState(true); // 초기엔 숨겨서 깜빡임 방지, 마운트 후 판단
@@ -93,10 +89,17 @@ export default function NoticeBanner() {
               fontSize: 15,
               color: "#333",
               lineHeight: 1.7,
-              whiteSpace: "pre-line",
             }}
           >
-            {NOTICE_TEXT}
+            갑작스러운 동기들과의 점심 약속부터 팀 점심 장소 추천까지! 🍽️
+            <br />
+            입사 후 매일 11시 30분부터 무한 고민을 시작할 댕턴들을 위해, 공덕 맛집을 섭렵한
+            선배들의 찐 후기를 모아모아 <strong>[댕턴뭐먹지 맵]</strong>을 만들었습니다 🗺️✨
+            <br />
+            더 알찬 메뉴 추천으로 도움을 드리기 위해{" "}
+            <strong>익명 후기, 찜, 식당 등록 기능도 적극 활용해 주세요!</strong>
+            <br />
+            여러분 오늘도 모두 맛점하세요! 😋🍚
           </p>
         </div>
       )}
