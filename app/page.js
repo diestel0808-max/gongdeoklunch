@@ -695,6 +695,8 @@ export default function HomePage() {
           .app-header { padding: 22px 28px !important; }
           .header-logo { height: 42px !important; }
           .notice-title { font-size: 14px !important; }
+          .notice-toggle-label { font-size: 11px !important; }
+          .notice-toggle-label { font-size: 14px !important; }
           .header-logo-row { flex-direction: row !important; align-items: center !important; gap: 10px !important; }
           .header-actions-desktop { display: flex !important; }
           .mobile-menu-btn { display: none !important; }

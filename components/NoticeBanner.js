@@ -45,9 +45,9 @@ export default function NoticeBanner() {
       }}
     >
       <div onClick={() => setExpanded((v) => !v)} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
-        <span className="notice-title" style={{ fontSize: 16, flex: 1, fontWeight: 700, color: "var(--color-navy)" }}>
+        <span className="notice-title" style={{ fontSize: 10, flex: 1, fontWeight: 700, color: "var(--color-navy)" }}>
           📢 "오늘 점심 뭐 먹지?" 매일 고민되는 댕턴이라면 주목! 👀{" "}
-          <span style={{ fontWeight: 400, color: "#0a8fa0", fontSize: 14 }}>
+          <span className="notice-toggle-label" style={{ fontWeight: 400, color: "#0a8fa0", fontSize: 10 }}>
             {expanded ? "접기 ▲" : "자세히 보기 ▼"}
           </span>
         </span>
