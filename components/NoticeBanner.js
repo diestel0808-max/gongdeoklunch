@@ -39,13 +39,13 @@ export default function NoticeBanner() {
         position: "relative",
         background: "var(--color-teal-light)",
         borderBottom: "1px solid var(--color-teal)",
-        padding: "12px 16px",
+        padding: "12px 14px",
         cursor: "pointer",
         zIndex: 30,
       }}
     >
-      <div onClick={() => setExpanded((v) => !v)} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
-        <span className="notice-title" style={{ fontSize: 10, flex: 1, fontWeight: 700, color: "var(--color-navy)" }}>
+      <div onClick={() => setExpanded((v) => !v)} style={{ display: "flex", alignItems: "flex-start", gap: 6 }}>
+        <span className="notice-title" style={{ fontSize: 11.5, flex: 1, fontWeight: 700, color: "var(--color-navy)" }}>
           📢 "오늘 점심 뭐 먹지?" 매일 고민되는 댕턴이라면 주목! 👀{" "}
           <span className="notice-toggle-label" style={{ fontWeight: 400, color: "#0a8fa0", fontSize: 10 }}>
             {expanded ? "접기 ▲" : "자세히 보기 ▼"}
@@ -56,7 +56,7 @@ export default function NoticeBanner() {
           style={{
             border: "none",
             background: "transparent",
-            fontSize: 16,
+            fontSize: 14,
             color: "#666",
             cursor: "pointer",
             flexShrink: 0,
