@@ -37,6 +37,25 @@ function joinValues(value) {
 }
 
 // 필터가 "전체"가 아니라 실제로 적용중일 때 눈에 띄게 강조
+// 모바일 서랍 메뉴의 버튼 하나하나에 쓰는 공통 스타일
+function mobileMenuItemStyle(background, color, outlined = false) {
+  return {
+    display: "block",
+    width: "100%",
+    textAlign: "left",
+    padding: "12px 14px",
+    borderRadius: 8,
+    border: outlined ? "1px solid var(--color-gray-300)" : "none",
+    background,
+    color,
+    fontWeight: 700,
+    fontSize: 14,
+    cursor: "pointer",
+    marginBottom: 10,
+    boxSizing: "border-box",
+  };
+}
+
 function filterSelectStyle(isActive) {
   return {
     fontSize: 13,
@@ -402,6 +421,7 @@ export default function HomePage() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showMyPage, setShowMyPage] = useState(false);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
 
   useEffect(() => {
     // 이 브라우저에 저장된 닉네임이 없으면(첫 접속) 온보딩 팝업을 띄움
@@ -561,12 +581,14 @@ export default function HomePage() {
         }}
       >
         <div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div className="header-logo-row" style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 4 }}>
             <img src="/logo.png" alt="댕턴뭐먹지" className="header-logo" style={{ height: 30, display: "block" }} />
             <p style={{ fontSize: 12, color: "#7a8288" }}>{OFFICE.name} 기준</p>
           </div>
         </div>
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
+
+        {/* PC에서만 보이는 기존 버튼 그룹 (그대로 유지) */}
+        <div className="header-actions-desktop" style={{ display: "none", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
           <button
             onClick={() => setShowLunchPicker(true)}
             style={{
@@ -633,6 +655,25 @@ export default function HomePage() {
             + 식당 등록
           </button>
         </div>
+
+        {/* 모바일에서만 보이는 햄버거 버튼 - 누르면 오른쪽에서 메뉴 서랍이 열림 */}
+        <button
+          className="mobile-menu-btn"
+          onClick={() => setShowMobileMenu(true)}
+          style={{
+            fontSize: 22,
+            width: 40,
+            height: 40,
+            borderRadius: 8,
+            border: "1px solid var(--color-gray-300)",
+            background: "#fff",
+            color: "var(--color-navy)",
+            cursor: "pointer",
+            flexShrink: 0,
+          }}
+        >
+          ☰
+        </button>
       </header>
 
       <NoticeBanner />
@@ -653,6 +694,9 @@ export default function HomePage() {
           .app-header { padding: 22px 28px !important; }
           .header-logo { height: 42px !important; }
           .notice-title { font-size: 14px !important; }
+          .header-logo-row { flex-direction: row !important; align-items: center !important; gap: 10px !important; }
+          .header-actions-desktop { display: flex !important; }
+          .mobile-menu-btn { display: none !important; }
         }
       `}</style>
 
@@ -951,6 +995,86 @@ export default function HomePage() {
             refreshAllReviews();
           }}
         />
+      )}
+
+      {showMobileMenu && (
+        <div
+          onClick={() => setShowMobileMenu(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(27,42,52,0.5)",
+            zIndex: 80,
+            display: "flex",
+            justifyContent: "flex-end",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#fff",
+              width: "78%",
+              maxWidth: 300,
+              height: "100%",
+              padding: 20,
+              boxShadow: "-4px 0 20px rgba(0,0,0,0.2)",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <img src="/logo.png" alt="댕턴뭐먹지" style={{ height: 22 }} />
+              <button
+                onClick={() => setShowMobileMenu(false)}
+                style={{ border: "none", background: "transparent", fontSize: 20, cursor: "pointer" }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <button
+              onClick={() => {
+                setShowMobileMenu(false);
+                setShowLunchPicker(true);
+              }}
+              style={mobileMenuItemStyle("var(--color-navy)", "#fff")}
+            >
+              🍽 오늘 점심 뭐 먹지?
+            </button>
+
+            <div style={{ marginBottom: 10 }}>
+              <ShareButton style={{ width: "100%", boxSizing: "border-box", textAlign: "left", padding: "12px 14px" }} />
+            </div>
+
+            <button
+              onClick={() => {
+                setShowMobileMenu(false);
+                setShowMyPage(true);
+              }}
+              style={mobileMenuItemStyle("#fff", "var(--color-navy)", true)}
+            >
+              🙋 마이페이지
+            </button>
+
+            <button
+              onClick={() => {
+                setShowMobileMenu(false);
+                setShowAddRestaurant(true);
+              }}
+              style={mobileMenuItemStyle("var(--color-teal)", "#fff")}
+            >
+              + 식당 등록
+            </button>
+
+            <button
+              onClick={() => {
+                setShowMobileMenu(false);
+                setShowAdminPanel(true);
+              }}
+              style={mobileMenuItemStyle("#fff", "#999", true)}
+            >
+              ⚙️ 관리자 페이지
+            </button>
+          </div>
+        </div>
       )}
     </main>
   );

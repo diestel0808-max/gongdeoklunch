@@ -136,7 +136,7 @@ export default function KakaoMap({ restaurants = [], onMarkerClick, highlightedI
     markersRef.current = [];
     // 이전에 열려있던 말풍선(정보창)들을 확실히 닫아서, 마커를 다시 그릴 때
     // 예전 말풍선이 화면에 계속 남아있는 문제를 방지합니다.
-    infoWindowsRef.current.forEach((iw) => iw.close());
+    infoWindowsRef.current.forEach((overlay) => overlay.setMap(null));
     infoWindowsRef.current = [];
 
     const maxDistance = Math.max(...restaurants.map((r) => r.distanceMeters || 0), 1);
@@ -161,17 +161,22 @@ export default function KakaoMap({ restaurants = [], onMarkerClick, highlightedI
         zIndex: isHighlighted ? 9 : Math.round(10 - ratio * 5),
       });
 
-      const infoWindow = new kakao.maps.InfoWindow({
-        content: `<div style="padding:6px 10px;font-size:12px;">${restaurant.name}</div>`,
+      // 밀집된 지역에서 이름표가 바로 옆/아래 다른 핀과 겹치지 않도록,
+      // 마커보다 충분히 위쪽에 뜨는 커스텀 오버레이를 사용 (기본 InfoWindow보다 위치 제어가 자유로움)
+      const nameOverlay = new kakao.maps.CustomOverlay({
+        position,
+        content: `<div style="padding:5px 9px;font-size:12px;background:#1b2a34;color:#fff;border-radius:6px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.25);">${restaurant.name}</div>`,
+        yAnchor: 2.3,
+        zIndex: 30,
       });
-      infoWindowsRef.current.push(infoWindow);
+      infoWindowsRef.current.push(nameOverlay);
 
-      kakao.maps.event.addListener(marker, "mouseover", () => infoWindow.open(map, marker));
-      kakao.maps.event.addListener(marker, "mouseout", () => infoWindow.close());
+      kakao.maps.event.addListener(marker, "mouseover", () => nameOverlay.setMap(map));
+      kakao.maps.event.addListener(marker, "mouseout", () => nameOverlay.setMap(null));
 
       if (onMarkerClick) {
         kakao.maps.event.addListener(marker, "click", () => {
-          infoWindow.close();
+          nameOverlay.setMap(null);
           onMarkerClick(restaurant);
         });
       }
@@ -180,7 +185,7 @@ export default function KakaoMap({ restaurants = [], onMarkerClick, highlightedI
 
       if (isHighlighted) {
         marker.setMap(map);
-        infoWindow.open(map, marker);
+        nameOverlay.setMap(map);
       } else {
         clusterableMarkers.push(marker);
       }

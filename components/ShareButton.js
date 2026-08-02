@@ -6,10 +6,17 @@ export default function ShareButton({ style }) {
   const [toastMessage, setToastMessage] = useState("");
 
   const handleShare = async () => {
+    // 카카오톡은 링크 미리보기를 한 번 캐싱하면 이미지가 바뀌어도 예전 걸 계속 보여줌.
+    // 순수 주소(예: gongdeoklunch.vercel.app)는 예전에 캐싱된 적이 있어서,
+    // 뒤에 고정된 버전 쿼리를 붙여 "새 링크"로 인식시켜 항상 최신 미리보기가 뜨게 함.
+    // (오픈그래프 이미지/문구를 나중에 또 바꾸면 이 숫자를 올려주면 됨)
+    const OG_CACHE_VERSION = "2";
+    const shareUrl = `${window.location.origin}/?ogv=${OG_CACHE_VERSION}`;
+
     const shareData = {
       title: "댕턴 뭐먹지 | 댕턴에 의한, 댕턴을 위한 점메추 지도",
       text: "같이 메뉴 고르러 가기! 🍚",
-      url: window.location.origin,
+      url: shareUrl,
     };
 
     // 모바일: 카카오톡/팀즈 등이 설치되어 있으면 그 목록이 포함된 공유창이 뜸
