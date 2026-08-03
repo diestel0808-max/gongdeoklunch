@@ -130,7 +130,7 @@ export default function KakaoMap({ restaurants = [], onMarkerClick, highlightedI
         const officeInfo = new kakao.maps.CustomOverlay({
           position: officePosition,
           content: `<div style="padding:6px 10px;font-size:12px;font-weight:700;background:#fff;border:1px solid var(--color-gray-300, #dcdfe2);border-radius:6px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.15);">🏢 ${OFFICE.name}</div>`,
-          yAnchor: 2.0,
+          yAnchor: 3.0,
           zIndex: 100,
         });
         officeInfo.setMap(map);
