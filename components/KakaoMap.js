@@ -68,7 +68,11 @@ function buildHighlightMarkerImage(kakao) {
 // restaurants: 지도에 표시할 식당 목록
 // onMarkerClick: 식당 마커를 클릭했을 때 호출 (식당 객체를 인자로 받음)
 // highlightedId: 이 id의 식당만 회사 마커급으로 크고 다른 색(주황)으로 강조 표시
-export default function KakaoMap({ restaurants = [], onMarkerClick, highlightedId }) {
+export default function KakaoMap({ restaurants = [], onMarkerClick, highlightedId, onMapClick }) {
+  const onMapClickRef = useRef(onMapClick);
+  useEffect(() => {
+    onMapClickRef.current = onMapClick;
+  }, [onMapClick]);
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const clustererRef = useRef(null);
@@ -104,30 +108,15 @@ export default function KakaoMap({ restaurants = [], onMarkerClick, highlightedI
         });
 
         const officeMarkerSvg = `
-          <svg xmlns="http://www.w3.org/2000/svg" width="72" height="88" viewBox="0 0 72 88">
-            <ellipse cx="36" cy="86" rx="22" ry="4" fill="#3a7ca5" opacity="0.18"/>
-            <polygon points="10,78 36,70 62,78 36,86" fill="#eef3f5" stroke="#dbe3e7" stroke-width="1"/>
-            <circle cx="14" cy="73" r="4" fill="#8fcf9f"/>
-            <rect x="13" y="76" width="2" height="6" fill="#b9a385"/>
-            <circle cx="58" cy="73" r="4" fill="#8fcf9f"/>
-            <rect x="57" y="76" width="2" height="6" fill="#b9a385"/>
-            <polygon points="44,20 56,13 56,65 44,72" fill="#d7dfe3"/>
-            <rect x="20" y="20" width="24" height="52" fill="#f4f6f7"/>
-            <polygon points="20,20 32,13 56,13 44,20" fill="#eafbfb"/>
-            <rect x="22" y="26" width="19" height="4" rx="1" fill="#8fd6dd"/>
-            <rect x="22" y="35" width="19" height="4" rx="1" fill="#8fd6dd"/>
-            <rect x="22" y="44" width="19" height="4" rx="1" fill="#8fd6dd"/>
-            <rect x="22" y="53" width="19" height="4" rx="1" fill="#8fd6dd"/>
-            <rect x="46" y="24" width="8" height="3" rx="1" fill="#c3ccd0"/>
-            <rect x="46" y="32" width="8" height="3" rx="1" fill="#c3ccd0"/>
-            <rect x="46" y="40" width="8" height="3" rx="1" fill="#c3ccd0"/>
-            <rect x="46" y="48" width="8" height="3" rx="1" fill="#c3ccd0"/>
-            <rect x="28" y="62" width="8" height="10" fill="#1bc5d8"/>
+          <svg xmlns="http://www.w3.org/2000/svg" width="46" height="58" viewBox="0 0 46 58">
+            <path d="M23 0C10.3 0 0 10.3 0 23c0 17.3 23 35 23 35s23-17.7 23-35C46 10.3 35.7 0 23 0z" fill="#1b2a34"/>
+            <circle cx="23" cy="23" r="15" fill="#1bc5d8"/>
+            <circle cx="23" cy="23" r="6" fill="#ffffff"/>
           </svg>`;
         const officeMarkerImage = new kakao.maps.MarkerImage(
           `data:image/svg+xml;charset=utf-8,${encodeURIComponent(officeMarkerSvg)}`,
-          new kakao.maps.Size(56, 68),
-          { offset: new kakao.maps.Point(28, 66) }
+          new kakao.maps.Size(46, 58),
+          { offset: new kakao.maps.Point(23, 58) }
         );
         const officeMarker = new kakao.maps.Marker({
           position: officePosition,
@@ -135,10 +124,24 @@ export default function KakaoMap({ restaurants = [], onMarkerClick, highlightedI
           image: officeMarkerImage,
           zIndex: 10,
         });
-        const officeInfo = new kakao.maps.InfoWindow({
-          content: `<div style="padding:6px 10px;font-size:12px;font-weight:700;">🏢 ${OFFICE.name}</div>`,
+        // 클러스터 숫자 버블(밀집 지역에서)이 이 이름표를 가리는 문제가 있어서,
+        // 일반 InfoWindow 대신 zIndex를 훨씬 높게 줄 수 있는 커스텀 오버레이로 교체하고
+        // 건물 위로 더 띄워서 겹치지 않게 함
+        const officeInfo = new kakao.maps.CustomOverlay({
+          position: officePosition,
+          content: `<div style="padding:6px 10px;font-size:12px;font-weight:700;background:#fff;border:1px solid var(--color-gray-300, #dcdfe2);border-radius:6px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.15);">🏢 ${OFFICE.name}</div>`,
+          yAnchor: 2.0,
+          zIndex: 100,
         });
-        officeInfo.open(map, officeMarker);
+        officeInfo.setMap(map);
+
+        // 지도 빈 공간을 클릭하면: 1) 열려있는 이름표 말풍선을 전부 닫고
+        // (터치 환경에서 mouseout이 안 일어나 말풍선이 안 닫히는 문제 보완)
+        // 2) 상위 컴포넌트에 "선택 해제"를 알려서 상세보기가 자동으로 닫히게 함
+        kakao.maps.event.addListener(map, "click", () => {
+          infoWindowsRef.current.forEach((overlay) => overlay.setMap(null));
+          onMapClickRef.current?.();
+        });
 
         mapInstanceRef.current = { map, kakao, officePosition };
         setStatus("ready");

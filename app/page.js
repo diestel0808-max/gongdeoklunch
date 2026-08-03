@@ -709,6 +709,7 @@ export default function HomePage() {
             restaurants={sortedRestaurants}
             highlightedId={detailTarget?.id}
             onMarkerClick={handleMarkerClick}
+            onMapClick={() => setDetailTarget(null)}
           />
         </div>
 
