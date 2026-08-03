@@ -4,6 +4,27 @@ import { useEffect, useRef, useState } from "react";
 import { OFFICE } from "@/lib/constants";
 import { loadKakaoMapScript } from "@/lib/kakaoLoader";
 
+// 문자열(식당 id)을 항상 같은 숫자로 바꿔주는 간단한 해시 함수
+// (매번 렌더링해도 같은 식당은 항상 같은 방향/거리로 흩어지도록 하기 위함 - 무작위 아님)
+function hashString(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i += 1) {
+    hash = (hash << 5) - hash + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+}
+
+// 미터 단위 오프셋을 위/경도 오프셋으로 변환
+function metersToLatLngOffset(offsetMetersLat, offsetMetersLng, baseLat) {
+  const metersPerDegLat = 111320;
+  const metersPerDegLng = 111320 * Math.cos((baseLat * Math.PI) / 180);
+  return {
+    dLat: offsetMetersLat / metersPerDegLat,
+    dLng: offsetMetersLng / metersPerDegLng,
+  };
+}
+
 // 회사 마커와 같은 눈물방울(핀) 모양으로, 크기만 훨씬 작게 만듦
 function buildRestaurantMarkerImage(kakao, visibleSizePx) {
   const w = visibleSizePx;
@@ -83,23 +104,30 @@ export default function KakaoMap({ restaurants = [], onMarkerClick, highlightedI
         });
 
         const officeMarkerSvg = `
-          <svg xmlns="http://www.w3.org/2000/svg" width="64" height="80" viewBox="0 0 64 80">
-            <ellipse cx="32" cy="76" rx="18" ry="4" fill="#000000" opacity="0.15"/>
-            <polygon points="42,28 54,20 54,62 42,70" fill="#0e161d"/>
-            <rect x="14" y="28" width="28" height="42" fill="#1b2a34"/>
-            <polygon points="14,28 26,20 54,20 42,28" fill="#1bc5d8"/>
-            <rect x="19" y="35" width="6" height="6" fill="#3a4a56"/>
-            <rect x="31" y="35" width="6" height="6" fill="#3a4a56"/>
-            <rect x="19" y="47" width="6" height="6" fill="#3a4a56"/>
-            <rect x="31" y="47" width="6" height="6" fill="#3a4a56"/>
-            <rect x="24" y="59" width="8" height="11" fill="#1bc5d8"/>
-            <line x1="26" y1="20" x2="26" y2="9" stroke="#1b2a34" stroke-width="2"/>
-            <circle cx="26" cy="7" r="3.5" fill="#1bc5d8"/>
+          <svg xmlns="http://www.w3.org/2000/svg" width="72" height="88" viewBox="0 0 72 88">
+            <ellipse cx="36" cy="86" rx="22" ry="4" fill="#3a7ca5" opacity="0.18"/>
+            <polygon points="10,78 36,70 62,78 36,86" fill="#eef3f5" stroke="#dbe3e7" stroke-width="1"/>
+            <circle cx="14" cy="73" r="4" fill="#8fcf9f"/>
+            <rect x="13" y="76" width="2" height="6" fill="#b9a385"/>
+            <circle cx="58" cy="73" r="4" fill="#8fcf9f"/>
+            <rect x="57" y="76" width="2" height="6" fill="#b9a385"/>
+            <polygon points="44,20 56,13 56,65 44,72" fill="#d7dfe3"/>
+            <rect x="20" y="20" width="24" height="52" fill="#f4f6f7"/>
+            <polygon points="20,20 32,13 56,13 44,20" fill="#eafbfb"/>
+            <rect x="22" y="26" width="19" height="4" rx="1" fill="#8fd6dd"/>
+            <rect x="22" y="35" width="19" height="4" rx="1" fill="#8fd6dd"/>
+            <rect x="22" y="44" width="19" height="4" rx="1" fill="#8fd6dd"/>
+            <rect x="22" y="53" width="19" height="4" rx="1" fill="#8fd6dd"/>
+            <rect x="46" y="24" width="8" height="3" rx="1" fill="#c3ccd0"/>
+            <rect x="46" y="32" width="8" height="3" rx="1" fill="#c3ccd0"/>
+            <rect x="46" y="40" width="8" height="3" rx="1" fill="#c3ccd0"/>
+            <rect x="46" y="48" width="8" height="3" rx="1" fill="#c3ccd0"/>
+            <rect x="28" y="62" width="8" height="10" fill="#1bc5d8"/>
           </svg>`;
         const officeMarkerImage = new kakao.maps.MarkerImage(
           `data:image/svg+xml;charset=utf-8,${encodeURIComponent(officeMarkerSvg)}`,
-          new kakao.maps.Size(64, 80),
-          { offset: new kakao.maps.Point(32, 76) }
+          new kakao.maps.Size(56, 68),
+          { offset: new kakao.maps.Point(28, 66) }
         );
         const officeMarker = new kakao.maps.Marker({
           position: officePosition,
@@ -155,7 +183,25 @@ export default function KakaoMap({ restaurants = [], onMarkerClick, highlightedI
     const clusterableMarkers = [];
 
     restaurants.forEach((restaurant) => {
-      const position = new kakao.maps.LatLng(restaurant.lat, restaurant.lng);
+      // 회사 건물과 아주 가까운(같은 건물 등) 식당은 좌표가 사실상 똑같아서
+      // 마커가 랜드마크 아이콘 바로 밑에 겹쳐 쌓이는 문제가 있었습니다.
+      // 이런 경우엔 식당 id를 기반으로 한 고정된 방향/거리로 살짝 흩어서 찍습니다.
+      let markerLat = restaurant.lat;
+      let markerLng = restaurant.lng;
+      if ((restaurant.distanceMeters || 0) < 25) {
+        const h = hashString(String(restaurant.id));
+        const angle = ((h % 360) * Math.PI) / 180;
+        const radius = 16 + (h % 14); // 16~30m 사이에서 고정된 값으로 흩어짐
+        const { dLat, dLng } = metersToLatLngOffset(
+          radius * Math.sin(angle),
+          radius * Math.cos(angle),
+          restaurant.lat
+        );
+        markerLat += dLat;
+        markerLng += dLng;
+      }
+
+      const position = new kakao.maps.LatLng(markerLat, markerLng);
       const isHighlighted = highlightedId && String(restaurant.id) === String(highlightedId);
 
       const ratio = Math.min((restaurant.distanceMeters || 0) / maxDistance, 1);
