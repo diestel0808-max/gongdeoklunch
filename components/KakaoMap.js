@@ -83,15 +83,23 @@ export default function KakaoMap({ restaurants = [], onMarkerClick, highlightedI
         });
 
         const officeMarkerSvg = `
-          <svg xmlns="http://www.w3.org/2000/svg" width="46" height="58" viewBox="0 0 46 58">
-            <path d="M23 0C10.3 0 0 10.3 0 23c0 17.3 23 35 23 35s23-17.7 23-35C46 10.3 35.7 0 23 0z" fill="#1b2a34"/>
-            <circle cx="23" cy="23" r="15" fill="#1bc5d8"/>
-            <circle cx="23" cy="23" r="6" fill="#ffffff"/>
+          <svg xmlns="http://www.w3.org/2000/svg" width="64" height="80" viewBox="0 0 64 80">
+            <ellipse cx="32" cy="76" rx="18" ry="4" fill="#000000" opacity="0.15"/>
+            <polygon points="42,28 54,20 54,62 42,70" fill="#0e161d"/>
+            <rect x="14" y="28" width="28" height="42" fill="#1b2a34"/>
+            <polygon points="14,28 26,20 54,20 42,28" fill="#1bc5d8"/>
+            <rect x="19" y="35" width="6" height="6" fill="#3a4a56"/>
+            <rect x="31" y="35" width="6" height="6" fill="#3a4a56"/>
+            <rect x="19" y="47" width="6" height="6" fill="#3a4a56"/>
+            <rect x="31" y="47" width="6" height="6" fill="#3a4a56"/>
+            <rect x="24" y="59" width="8" height="11" fill="#1bc5d8"/>
+            <line x1="26" y1="20" x2="26" y2="9" stroke="#1b2a34" stroke-width="2"/>
+            <circle cx="26" cy="7" r="3.5" fill="#1bc5d8"/>
           </svg>`;
         const officeMarkerImage = new kakao.maps.MarkerImage(
           `data:image/svg+xml;charset=utf-8,${encodeURIComponent(officeMarkerSvg)}`,
-          new kakao.maps.Size(46, 58),
-          { offset: new kakao.maps.Point(23, 58) }
+          new kakao.maps.Size(64, 80),
+          { offset: new kakao.maps.Point(32, 76) }
         );
         const officeMarker = new kakao.maps.Marker({
           position: officePosition,

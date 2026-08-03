@@ -721,7 +721,8 @@ export default function HomePage() {
           />
         ) : (
         <>
-        <div style={{ padding: "10px 16px 0", position: "relative" }}>
+        <div style={{ padding: "10px 16px 0" }}>
+        <div style={{ position: "relative" }}>
         <input
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
@@ -742,7 +743,7 @@ export default function HomePage() {
             onClick={() => setSearchQuery("")}
             style={{
               position: "absolute",
-              right: 24,
+              right: 8,
               top: "50%",
               transform: "translateY(-50%)",
               border: "none",
@@ -757,6 +758,7 @@ export default function HomePage() {
             ✕
           </button>
         )}
+      </div>
       </div>
 
       <div
