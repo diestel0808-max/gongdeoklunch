@@ -92,6 +92,11 @@ export default function OnboardingModal({ onClose, onComplete }) {
       setSignupError("닉네임, 전화번호, 6자리 PIN을 모두 입력해주세요.");
       return;
     }
+    // 휴대폰 번호 형식 검증 (010/011/016/017/018/019로 시작하는 10~11자리)
+    if (!/^01[016789]\d{7,8}$/.test(signupPhone.trim())) {
+      setSignupError("전화번호 형식이 올바르지 않아요. 숫자만 입력해주세요. (예: 01012345678)");
+      return;
+    }
     if (signupPin.trim() !== signupPinConfirm.trim()) {
       setSignupError("PIN이 서로 일치하지 않아요. 다시 확인해주세요.");
       return;

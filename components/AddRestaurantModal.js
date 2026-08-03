@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import { CATEGORIES } from "@/lib/constants";
 import { addCustomRestaurant } from "@/lib/customRestaurantStorage";
 import { loadKakaoMapScript } from "@/lib/kakaoLoader";
-import { getDistanceMeters } from "@/lib/distance";
 
 export default function AddRestaurantModal({ onClose, onAdded, existingRestaurants = [] }) {
   const [keyword, setKeyword] = useState("");
@@ -44,18 +43,16 @@ export default function AddRestaurantModal({ onClose, onAdded, existingRestauran
   };
 
   // 이름이 같거나(공백 무시), 좌표가 아주 가까우면(15m 이내) 이미 등록된 곳으로 판단
+  // 같은 건물에 여러 식당이 입점해 있으면 카카오 좌표가 거의 동일하게 잡히는 경우가 많아서,
+  // "좌표가 가깝다"만으로 중복 판정하면 전혀 다른 식당(예: 같은 건물의 카페와 초밥집)이
+  // 서로 중복으로 잘못 걸리는 문제가 있었습니다. 그래서 이름이 실제로 같을 때만 중복으로 판단합니다.
   const duplicateRestaurant = useMemo(() => {
     if (!selectedPlace) return null;
     const normalizedName = selectedPlace.place_name.replace(/\s/g, "");
-    const lat = Number(selectedPlace.y);
-    const lng = Number(selectedPlace.x);
 
     return (
-      existingRestaurants.find((r) => {
-        const nameMatch = (r.name || "").replace(/\s/g, "") === normalizedName;
-        const distance = getDistanceMeters(r.lat, r.lng, lat, lng);
-        return nameMatch || distance < 15;
-      }) || null
+      existingRestaurants.find((r) => (r.name || "").replace(/\s/g, "") === normalizedName) ||
+      null
     );
   }, [selectedPlace, existingRestaurants]);
 
@@ -136,19 +133,47 @@ export default function AddRestaurantModal({ onClose, onAdded, existingRestauran
         </p>
 
         <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-          <input
-            value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-            placeholder="식당 이름 검색 (예: 두껍삼)"
-            style={{
-              flex: 1,
-              padding: "8px 10px",
-              borderRadius: 8,
-              border: "1px solid var(--color-gray-300)",
-              fontSize: 13,
-            }}
-          />
+          <div style={{ position: "relative", flex: 1 }}>
+            <input
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              placeholder="식당 이름 검색 (예: 두껍삼)"
+              style={{
+                width: "100%",
+                padding: "8px 30px 8px 10px",
+                borderRadius: 8,
+                border: "1px solid var(--color-gray-300)",
+                fontSize: 13,
+                boxSizing: "border-box",
+              }}
+            />
+            {keyword && (
+              <button
+                onClick={() => {
+                  setKeyword("");
+                  setResults([]);
+                  setSelectedPlace(null);
+                  setErrorMessage("");
+                }}
+                style={{
+                  position: "absolute",
+                  right: 8,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  border: "none",
+                  background: "transparent",
+                  color: "#999",
+                  fontSize: 15,
+                  cursor: "pointer",
+                  padding: 4,
+                  lineHeight: 1,
+                }}
+              >
+                ✕
+              </button>
+            )}
+          </div>
           <button
             onClick={handleSearch}
             style={{

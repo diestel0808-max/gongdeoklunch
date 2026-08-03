@@ -721,7 +721,7 @@ export default function HomePage() {
           />
         ) : (
         <>
-        <div style={{ padding: "10px 16px 0" }}>
+        <div style={{ padding: "10px 16px 0", position: "relative" }}>
         <input
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
@@ -730,12 +730,33 @@ export default function HomePage() {
           name="restaurant-search"
           style={{
             width: "100%",
-            padding: "10px 12px",
+            padding: "10px 36px 10px 12px",
             borderRadius: 8,
             border: "1px solid var(--color-gray-300)",
             fontSize: 13,
+            boxSizing: "border-box",
           }}
         />
+        {searchQuery && (
+          <button
+            onClick={() => setSearchQuery("")}
+            style={{
+              position: "absolute",
+              right: 24,
+              top: "50%",
+              transform: "translateY(-50%)",
+              border: "none",
+              background: "transparent",
+              color: "#999",
+              fontSize: 16,
+              cursor: "pointer",
+              padding: 4,
+              lineHeight: 1,
+            }}
+          >
+            ✕
+          </button>
+        )}
       </div>
 
       <div
@@ -900,7 +921,7 @@ export default function HomePage() {
       <div style={{ flex: 1, overflowY: "auto", padding: "8px 16px 24px" }}>
         {status === "loading" && (
           <p style={{ fontSize: 13, color: "#999", padding: "24px 0" }}>
-            공덕역 인근 식당 정보를 불러오는 중...
+            대학내일 ES 인근 식당 정보를 불러오는 중...
           </p>
         )}
 
